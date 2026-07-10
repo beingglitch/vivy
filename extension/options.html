@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Vivy Ingestor — Options</title>
+    <style>
+      body { font-family: system-ui, sans-serif; background: #0a0a0b; color: #eee; max-width: 480px; margin: 3rem auto; padding: 0 1rem; }
+      label { display: block; margin: 1rem 0 0.25rem; font-size: 0.85rem; color: #aaa; }
+      input { width: 100%; padding: 0.5rem; border-radius: 6px; border: 1px solid #444; background: #18181b; color: #eee; box-sizing: border-box; }
+      button { margin-top: 1.25rem; padding: 0.5rem 1.25rem; border-radius: 6px; border: none; background: #eee; color: #111; font-weight: 600; cursor: pointer; }
+      #status { margin-top: 0.75rem; font-size: 0.85rem; }
+    </style>
+  </head>
+  <body>
+    <h2>Vivy Ingestor</h2>
+    <label for="endpoint">Vivy URL</label>
+    <input id="endpoint" placeholder="https://vivy-xxxx.vercel.app" />
+    <label for="apiKey">Ingest key (VIVY_INGEST_KEY)</label>
+    <input id="apiKey" type="password" placeholder="paste key" />
+    <button id="save">Save & test</button>
+    <div id="status"></div>
+    <script src="options.js"></script>
+  </body>
+</html>

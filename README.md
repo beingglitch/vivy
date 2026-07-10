@@ -1,36 +1,45 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Vivy
 
-## Getting Started
+A personal AI assistant ecosystem — my Jarvis. One spine (Event API + Postgres + Claude),
+many ingestors (browser, screen-time agent, finance importer, audio recorder hardware),
+one assistant that knows everything and **tells me what to do today**.
 
-First, run the development server:
-
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+```
+                    ┌─────────────────────────────┐
+   INGESTORS        │        CORE (the spine)      │        INTERFACES
+                    │                              │
+ Browser extension ─┤                              ├─ Web dashboard
+ (videos watched)   │   Event API  →  Postgres     │  (tasks, money, notes)
+                    │                              │
+ Screen-time agent ─┤   AI layer (Claude):         ├─ Chat with Vivy
+ (laptop/phone)     │   • extract tasks from       │  (ask anything about
+                    │     transcripts              │   my life/data)
+ Finance importer  ─┤   • categorize expenses      │
+ (bank CSV, manual) │   • summarize videos/meetings├─ Daily briefing
+                    │   • daily brief & nudges     │  ("do these 3 today")
+ Hardware recorder ─┤   • long-term memory         │
+ (mic → Whisper →   │                              ├─ Proactive alerts
+  transcript)       └─────────────────────────────┘
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+**Stack:** Next.js (App Router) + TypeScript · Vercel · Neon Postgres + Drizzle ·
+Claude via AI SDK · Vercel Cron for the proactive jobs.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+**Core principle:** everything — a watched video, an expense, a meeting transcript, a
+screen-time sample — is *an event flowing into one timeline*. Adding a capability means
+adding an ingestor or an AI job, never a second app.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Roadmap (see `docs/TRACKER.md` for the live map)
 
-## Learn More
+1. **Spine + task pipeline** — Event API, DB, tasks/notes, daily "do this today" brief, chat.
+2. **Passive tracking** — browser extension (videos/pages), screen-time agent + suggestions.
+3. **Finance** — expenses, debt, bank import, AI categorization, monthly analysis.
+4. **Meeting pipeline** — record (phone first, custom hardware later) → transcribe → auto
+   notes/tasks/schedule.
+5. **Proactive Vivy** — she initiates: nudges, weekly reviews, startup/job dashboards.
 
-To learn more about Next.js, take a look at the following resources:
+## How this repo is run
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+This project uses the Vibe Coding OS: markdown is the source of truth. Read
+`docs/GUIDE.md`. Start every session from the latest `docs/journal/` entry; decide what to
+do from `docs/TRACKER.md`; `/spec` before non-trivial work; `/journal` before stopping.

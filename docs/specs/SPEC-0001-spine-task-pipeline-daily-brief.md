@@ -1,7 +1,7 @@
 ---
 id: SPEC-0001
 title: The spine — Event API, task pipeline, daily brief, chat
-status: draft            # draft | building | done
+status: building         # draft | building | done
 created: 2026-07-08
 ---
 
@@ -34,18 +34,21 @@ hardware, push notifications (email/Telegram delivery of the brief is a fast-fol
 multi-user anything.
 
 ## Tasks
-- [ ] Scaffold Next.js (App Router, TS, Tailwind, shadcn/ui) in this repo
-- [ ] Provision Neon Postgres (Vercel Marketplace); wire Drizzle + first migration
-- [ ] Schema: `events`, `tasks`, `projects`, `briefs`, `chat_messages`, `memories`
-- [ ] Event API routes + API-key middleware; curl smoke test
-- [ ] Tasks CRUD API + dashboard UI (inbox / today / done, project filters)
-- [ ] AI layer: Claude via AI SDK through AI Gateway; `lib/ai/` with task-extraction job
-- [ ] Event processor: unprocessed text events → proposed tasks (approve/reject UI)
-- [ ] Daily brief generator + Vercel Cron (`/api/cron/daily-brief`) + dashboard card
-- [ ] Chat route with tools (queryTasks, createTask, completeTask, queryEvents, remember)
-      + streaming chat UI
-- [ ] Simple auth (single-user passcode → session cookie) guarding everything
-- [ ] Deploy to Vercel prod; verify all acceptance criteria from phone + laptop
+- [x] Scaffold Next.js (App Router, TS, Tailwind) in this repo — verified running 2026-07-08
+- [x] Provision Neon Postgres (Vercel Marketplace); wire Drizzle + first migration
+- [x] Schema: `events`, `tasks`, `projects`, `briefs`, `chat_messages`, `memories`
+- [x] Event API routes + API-key middleware; curl smoke test
+- [x] Tasks CRUD API + dashboard UI (inbox / today / done; project filters still pending)
+- [x] AI layer: Claude via AI SDK through AI Gateway; `lib/ai/` with task-extraction job
+- [x] Event processor: unprocessed text events → proposed tasks (approve/reject UI) —
+      built + plumbing verified 2026-07-08; AI output untested (gateway blocked on card)
+- [x] Daily brief generator + Vercel Cron (`/api/cron/daily-brief`) + dashboard card —
+      built; AI output untested (gateway blocked)
+- [x] Chat route with tools (queryTasks, createTask, completeTask, queryEvents, remember)
+      + streaming chat UI — built; untested end-to-end (gateway blocked)
+- [x] Simple auth (single-user passcode → session cookie) guarding everything
+- [ ] Deploy intelligence layer to prod; verify all acceptance criteria from phone + laptop
+      (BLOCKED: user must add card on Vercel to unlock AI Gateway free credits)
 
 ## Notes
 - Architecture rule (from CLAUDE.md): everything is an event into one timeline.

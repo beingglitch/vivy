@@ -31,41 +31,54 @@ sections instead of deleting. Dated one-line bug notes under **Bugs**; post-mort
 ### Project scaffold & deploy pipeline
 Next.js + TypeScript app, Neon Postgres, Drizzle, deployed on Vercel from day one.
 
-- [ ] [ ] Scaffold Next.js (App Router, TS, Tailwind, shadcn/ui)
-- [ ] [ ] Neon Postgres provisioned + Drizzle ORM wired (migrations working)
-- [ ] [ ] Deployed to Vercel (preview + production), env vars managed via `vercel env`
-- [ ] [ ] Single-user auth (simple passcode/session — it's my private OS)
+- [x] [x] Scaffold Next.js (App Router, TS, Tailwind) — dev server verified 2026-07-08; shadcn/ui pending
+- [x] [x] Neon Postgres provisioned (Vercel Marketplace) + Drizzle wired; `drizzle-kit push` applied 2026-07-08
+- [x] [x] Deployed to Vercel production — https://vivy-sage.vercel.app — curl-verified 2026-07-08
+- [x] [x] Single-user auth (passcode → HMAC session cookie, proxy.ts wall) — verified: 401/redirect unauthed, 200 authed
 
 ### Event API — the one pipe [[SPEC-0001]]
 Every ingestor (browser, screen agent, finance, recorder) POSTs to this. The timeline table.
 
-- [ ] [ ] `events` table: id, ts, source, type, payload (jsonb), processed flag
-- [ ] [ ] `POST /api/events` with API-key auth (for future hardware/agents)
-- [ ] [ ] `GET /api/events` timeline query (filter by source/type/date)
-- [ ] [ ] Processing loop: unprocessed events → AI handler by type → derived records
+- [x] [x] `events` table: id, ts, source, type, title, payload (jsonb), processed flag
+- [x] [x] `POST /api/events` with API-key auth, single or batch (1–500) — curl-verified local + prod
+- [x] [x] `GET /api/events` timeline query (source/type/since/limit) — curl-verified
+- [x] [x] Processing loop: unprocessed events → AI handler by type → derived records. `lib/ai/process-events.ts` (Haiku), runs after each text-event ingest (`after()`) + `/api/cron/process`. Verified 2026-07-08 after gateway unlock: 3 analyzed, 2 correct tasks proposed, 0 errors
 
 ### Task pipeline [[SPEC-0001]]
 Tasks are the first-class citizen: created manually, by chat, or extracted from any event.
 
-- [ ] [ ] `tasks` table: title, detail, status, priority, due, project, source-event link
-- [ ] [ ] Task CRUD (API + UI): inbox → today → done flow
-- [ ] [ ] Projects/areas (startup, job, personal, finance) to group tasks
-- [ ] [ ] AI task extraction: any ingested text event can yield proposed tasks (approve/reject)
+- [x] [x] `tasks` table: title, detail, status, priority, due, project, source-event link
+- [x] [ ] Task CRUD (API + UI): API curl-verified; UI renders but not yet clicked through in a browser
+- [ ] [ ] Projects/areas (startup, job, personal, finance) — table exists, no UI/grouping yet
+- [x] [x] AI task extraction: any ingested text event can yield proposed tasks (approve/reject UI on /tasks) — verified 2026-07-08: note → 2 correct tasks with due dates; UI approve flow not yet clicked
 
 ### Daily brief — "what do we do today" [[SPEC-0001]]
 The Jarvis moment: every morning Vivy decides and tells me the plan.
 
-- [ ] [ ] Brief generator: Claude reads open tasks + deadlines + recent events → ranked plan
-- [ ] [ ] Vercel Cron job (morning) writes the brief; dashboard shows it
+- [x] [x] Brief generator: Claude reads open tasks + deadlines + 7-day trend + memories → ranked coach-style plan (`lib/ai/daily-brief.ts`, Sonnet) — verified locally 2026-07-08, real brief generated
+- [x] [ ] Vercel Cron job (09:15 IST) writes the brief; dashboard shows today's brief card
 - [ ] [ ] Brief delivery channel (email or Telegram push)
 - [ ] [ ] Evening review: what got done, what rolls over
 
 ### Chat with Vivy [[SPEC-0001]]
 Conversational interface over all my data, with tools.
 
-- [ ] [ ] Chat UI (streaming) on the dashboard
-- [ ] [ ] Vivy tools: query tasks/events/finance, create/complete tasks, add notes
-- [ ] [ ] Persistent memory: facts Vivy learns about me stored + injected into context
+- [x] [ ] Chat UI (streaming) at /chat, history persisted in chat_messages — built 2026-07-08; gateway blocked
+- [x] [ ] Vivy tools: queryTasks, createTask, completeTask, queryEvents, remember — built; untested
+- [x] [ ] Persistent memory: `remember` tool writes memories; injected into chat + brief prompts
+
+### Learning tracker — books & courses [[SPEC-0002]]
+One `learning` concept (kind: book|course), unit-based progress, coached in the brief.
+
+- [x] [x] `learning` table + APIs + /learning UI (+N logging, progress bars, add forms) — API curl-verified 2026-07-11; UI not yet clicked
+- [x] [x] Progress logs land as `learning.log` events; brief coaches on days-since-last-session
+- [x] [x] Notion import: 8 books + 13 courses with real statuses (one-time, 2026-07-11)
+- [x] [ ] Chat tools: logLearning / addLearning / queryLearning — built, untested in chat
+
+### Finance — manual entry (interim; auto-ingestion is the designed flow) [[SPEC-0002]]
+- [x] [x] `transactions` table + /finance page (amount+category+note, today list, month by category) — curl-verified 2026-07-11
+- [x] [ ] Chat tools: logExpense / queryFinance; brief mentions yesterday + 7d spend — built, untested
+- [ ] [ ] Replace manual with auto-ingestion (Epic 3: SMS/Gmail/bank) — manual stays as fallback
 
 **Bugs:** *(none open)*
 
@@ -74,9 +87,9 @@ Conversational interface over all my data, with tools.
 ## Epic 2 — Passive Tracking (knows what I watch & do)
 
 ### Browser extension — watch/browse history
-- [ ] [ ] Chrome/Firefox extension: logs video watched (YouTube title/channel/duration) + significant pages → `POST /api/events`
-- [ ] [ ] AI summarizer: what did I watch/read today, key takeaways as notes
-- [ ] [ ] Watch-time analytics on dashboard
+- [x] [x] Chrome MV3 extension in `extension/`: YouTube watches (title/channel/seconds), searches (google/bing/ddg/yt), per-site time → batched `POST /api/events`. Verified in user's real Chrome 2026-07-08: video.watch with channel + time-by-site showing on /browsing
+- [x] [ ] AI daily summary (`/api/cron/daily-summary`, Vercel Cron 09:00 IST, Haiku) — gateway unlocked 2026-07-08 (card added); first real cron run pending
+- [x] [x] Watch-time analytics: `/browsing` page (videos, searches, time-by-site, 24h/7d/30d) — verified with synthetic events
 
 ### Screen-time agent
 - [ ] [ ] Linux agent (active window + app time sampler) → events, auto-starts on boot
