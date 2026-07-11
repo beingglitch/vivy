@@ -84,6 +84,8 @@ One `learning` concept (kind: book|course), unit-based progress, coached in the 
 - [x] [x] Research papers [[SPEC-0005]]: topics (7 seeded, weighted, editable) + arXiv fetch + Haiku picks w/ why-lines + links — real run 2026-07-11: 7 papers suggested, all topics covered
 - [x] [x] Paper feedback loop: start-reading → learning kind 'paper' + topic weight +1; skip → −0.2 — API-verified 2026-07-11 (weight 1.0→2.0, learning row created)
 - [x] [ ] Daily paper suggestions via cron (piggybacked on daily-summary) — wired; first prod run pending deploy
+- [x] [x] Beginner recalibration: survey/tutorial candidates + beginner-aware ranking (he's read 1 paper) — re-run verified 2026-07-11: 2/3 picks are surveys
+- [x] [x] One-minute daily card on /learning (simple-English word+scenario+grammar, 3 real HN news picks w/ links, micro-bio; no repeats in 14d) — real run + screenshot 2026-07-11
 
 ### Finance — manual entry (interim; auto-ingestion is the designed flow) [[SPEC-0002]] [[SPEC-0003]]
 - [x] [x] `transactions` table + /finance page (amount+category+note, today list, month by category) — curl-verified 2026-07-11

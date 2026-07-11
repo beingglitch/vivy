@@ -72,8 +72,16 @@ export async function fetchAndSuggestPapers(): Promise<{ suggested: number }> {
   const candidates: (ArxivEntry & { topicId: string; topicName: string })[] = [];
   for (const t of active) {
     try {
-      for (const e of await fetchArxiv(t.query, 8)) {
-        if (!seen.has(e.arxivId)) candidates.push({ ...e, topicId: t.id, topicName: t.name });
+      // Newest work + surveys: surveys/tutorials are the readable on-ramp for a
+      // beginner (he has read exactly one paper so far).
+      const [fresh, surveys] = await Promise.all([
+        fetchArxiv(t.query, 6),
+        fetchArxiv(`(${t.query}) AND (all:survey OR all:tutorial OR all:introduction)`, 4).catch(() => []),
+      ]);
+      for (const e of [...surveys, ...fresh]) {
+        if (!seen.has(e.arxivId) && !candidates.some((c) => c.arxivId === e.arxivId)) {
+          candidates.push({ ...e, topicId: t.id, topicName: t.name });
+        }
       }
     } catch {
       // one topic failing (arXiv hiccup) must not kill the run
@@ -95,10 +103,13 @@ export async function fetchAndSuggestPapers(): Promise<{ suggested: number }> {
     system:
       'You curate research papers for one person: an engineer AND entrepreneur who is ' +
       'currently job-hunting, building toward something great, and dead-set on growing ' +
-      'his net worth by orders of magnitude. Pick the papers with the highest leverage ' +
-      'for him — employable skills, buildable ideas, technical depth in his weighted ' +
-      'interests. Respond ONLY with a JSON array like [{"i":0,"why":"one sharp sentence ' +
-      'on why HE should read it"}] — no markdown, no prose.',
+      'his net worth by orders of magnitude. IMPORTANT: he is a paper-reading BEGINNER — ' +
+      'the only paper he has finished is "Attention Is All You Need". Strongly prefer ' +
+      'surveys, tutorials, and accessible well-written papers over dense bleeding-edge ' +
+      'work; one readable classic beats three novelties he will abandon. Pick the papers ' +
+      'with the highest leverage he can actually finish. Respond ONLY with a JSON array ' +
+      'like [{"i":0,"why":"one sharp simple-English sentence on why HE should read it"}] ' +
+      '— no markdown, no prose.',
     prompt:
       `Interest weights (higher = more of it): ${weights}\n` +
       `Topics he is actively reading right now — each MUST get at least one pick if it has a candidate: ${

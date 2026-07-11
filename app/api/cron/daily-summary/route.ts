@@ -4,6 +4,7 @@ import { db, events } from '@/lib/db';
 import { browsingStats, fmtDuration } from '@/lib/browsing';
 import { snapshotNetWorth } from '@/lib/networth';
 import { fetchAndSuggestPapers } from '@/lib/papers';
+import { generateDailyMinute } from '@/lib/daily-minute';
 import { VIVY_MODEL_FAST } from '@/lib/ai';
 
 export const maxDuration = 120;
@@ -17,9 +18,10 @@ export async function GET(req: NextRequest) {
   }
 
   // Piggy-back daily jobs on this cron (Hobby plan cron quota): the net-worth
-  // snapshot and the day's research-paper suggestions.
+  // snapshot, the day's research-paper suggestions, and the one-minute card.
   await snapshotNetWorth().catch(() => {});
   const papersRun = await fetchAndSuggestPapers().catch(() => ({ suggested: -1 }));
+  await generateDailyMinute().catch(() => {});
 
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
   const stats = await browsingStats(since);

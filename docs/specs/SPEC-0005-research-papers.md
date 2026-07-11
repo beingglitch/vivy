@@ -59,3 +59,23 @@ who I am — the reading behavior reveals it, and Vivy reports it back over time
 - [x] Cron hookup + `/api/papers/[id]` (read/skip) + `/api/topics` CRUD
 - [x] /learning UI: suggestions, topics editor, papers section
 - [x] Verify with a real fetch locally; screenshots
+
+## Addendum (2026-07-11, late) — beginner recalibration + the one-minute card
+
+User feedback: he has read exactly ONE paper (Attention Is All You Need); the first
+batch was too complex. Changes:
+
+- **Fetch**: each topic now also pulls survey/tutorial/introduction papers; the
+  ranking prompt states he is a paper-reading beginner and prefers readable
+  surveys/classics over bleeding-edge density. Old suggestions cleared; re-run
+  produced 3 picks, 2 of them surveys, with simple-English why-lines.
+- **One-minute daily card** (`lib/daily-minute.ts`, event type `ai.daily-minute`,
+  rides the same daily cron; card at the top of /learning):
+  1. **Word** — simple English word + plain meaning + a usage sentence from his
+     world + a one-line grammar note (he's building fluency; ≤1 minute).
+  2. **News** — 3 real Hacker News stories (free API, not model memory) picked for
+     his topics, one simple sentence each, with links.
+  3. **Bio** — a person/company/concept worth knowing, two short sentences, with
+     the lesson for him. Words/bios don't repeat within 14 days.
+- Manual trigger: `POST /api/daily-minute` (verified with a real run: "bottleneck",
+  3 relevant HN stories, Claude Shannon).
