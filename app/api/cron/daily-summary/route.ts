@@ -3,6 +3,7 @@ import { generateText } from 'ai';
 import { db, events } from '@/lib/db';
 import { browsingStats, fmtDuration } from '@/lib/browsing';
 import { snapshotNetWorth } from '@/lib/networth';
+import { fetchAndSuggestPapers } from '@/lib/papers';
 import { VIVY_MODEL_FAST } from '@/lib/ai';
 
 export const maxDuration = 120;
@@ -15,15 +16,16 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
 
-  // Piggy-back the daily net-worth snapshot on this cron so the trend line
-  // gets a point every day even when no position is edited.
+  // Piggy-back daily jobs on this cron (Hobby plan cron quota): the net-worth
+  // snapshot and the day's research-paper suggestions.
   await snapshotNetWorth().catch(() => {});
+  const papersRun = await fetchAndSuggestPapers().catch(() => ({ suggested: -1 }));
 
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
   const stats = await browsingStats(since);
 
   if (stats.videos.length === 0 && stats.searches.length === 0 && stats.domains.length === 0) {
-    return NextResponse.json({ ok: true, skipped: 'no browser events in last 24h' });
+    return NextResponse.json({ ok: true, skipped: 'no browser events in last 24h', papers: papersRun });
   }
 
   const digest = [

@@ -66,8 +66,10 @@ export function PositionRow({ item, max }: { item: Position; max: number }) {
 
   return (
     <li className={`space-y-1.5 px-4 py-2.5 ${item.consider ? '' : 'opacity-60'}`}>
-      <div className="flex items-center gap-3 text-sm">
-        <span className="w-32 shrink-0 truncate text-moth" title={item.note ?? item.name}>
+      {/* On phones the bar wraps to its own full-width line so the row never
+          overflows the viewport; from sm up it sits inline as before. */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm">
+        <span className="min-w-0 flex-1 truncate text-moth sm:w-32 sm:flex-none" title={item.note ?? item.name}>
           {item.name}
         </span>
         {!item.consider && (
@@ -77,19 +79,19 @@ export function PositionRow({ item, max }: { item: Position; max: number }) {
         )}
         {item.nextOutflow && Number(item.nextOutflow) > 0 && (
           <span
-            className="shrink-0 rounded-full bg-ember/15 px-2 py-0.5 font-mono text-[10px] text-ember"
+            className="shrink-0 rounded-full bg-ember/15 px-2 py-0.5 font-mono text-[10px] whitespace-nowrap text-ember"
             title="Planned payment next month"
           >
             {fmtINR(Number(item.nextOutflow))} next mo
           </span>
         )}
-        <div className="h-2 flex-1 overflow-hidden rounded-full bg-seam/60">
+        <div className="order-last h-2 basis-full overflow-hidden rounded-full bg-seam/60 sm:order-none sm:flex-1 sm:basis-auto">
           <div
             className={`h-full rounded-r-full ${barColor}`}
             style={{ width: `${Math.max((v / max) * 100, 2)}%` }}
           />
         </div>
-        <span className="w-24 shrink-0 text-right font-mono text-xs text-linen/90">
+        <span className="shrink-0 text-right font-mono text-xs whitespace-nowrap text-linen/90 sm:w-24">
           {fmtINR(v)}
         </span>
         <button

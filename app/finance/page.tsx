@@ -94,12 +94,12 @@ function NetWorthTrend({ points }: { points: { day: string; net: number }[] }) {
           </circle>
         ))}
       </svg>
-      <div className="flex justify-between font-mono text-[10px] text-moth/70">
-        <span>{fmtDay(points[0].day)}</span>
+      <div className="flex items-baseline justify-between gap-3 font-mono text-[10px] text-moth/70">
+        <span className="shrink-0 whitespace-nowrap">{fmtDay(points[0].day)}</span>
         {points.length === 1 ? (
-          <span>day one — the line grows from here, one point a day</span>
+          <span className="text-right">day one — the line grows from here, one point a day</span>
         ) : (
-          <span>{fmtDay(points[points.length - 1].day)}</span>
+          <span className="shrink-0 whitespace-nowrap">{fmtDay(points[points.length - 1].day)}</span>
         )}
       </div>
     </div>
@@ -254,6 +254,59 @@ export default async function FinancePage() {
 
       <TxEntry />
 
+      {/* Everything daily lives right under the entry form. */}
+      <section>
+        <h2 className="mb-3 text-xs font-medium tracking-widest text-moth uppercase">Today</h2>
+        {today.length === 0 ? (
+          <p className="text-sm text-moth">Nothing logged yet today.</p>
+        ) : (
+          <ul className="divide-y divide-seam/60 rounded-xl border border-seam bg-veil/50">
+            {today.map((t) => (
+              <li key={t.id} className="flex items-center gap-3 px-4 py-3 text-sm">
+                <span className="w-20 shrink-0 font-mono text-linen/95">
+                  {t.type === 'income' ? <span className="text-sage">+</span> : ''}
+                  {fmtINR(Number(t.amount))}
+                </span>
+                <span className="rounded-full bg-seam/80 px-2 py-0.5 text-[10px] text-moth">
+                  {t.category}
+                </span>
+                <span className="flex-1 truncate text-moth">{t.note}</span>
+                <span className="shrink-0 font-mono text-xs text-moth/70">
+                  {t.ts.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })}
+                </span>
+                <TxDelete id={t.id} />
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section>
+        <h2 className="mb-3 text-xs font-medium tracking-widest text-moth uppercase">
+          Daily spend · last 14 days
+        </h2>
+        <div className="rounded-xl border border-seam bg-veil/50 px-4 pt-6 pb-3">
+          <div className="flex h-32 items-end gap-[3px]">
+            {days.map((d) => (
+              <div key={d.key} className="group relative flex h-full flex-1 flex-col justify-end">
+                <span className="pointer-events-none absolute -top-5 left-1/2 z-10 hidden -translate-x-1/2 rounded bg-night px-1.5 py-0.5 font-mono text-[10px] whitespace-nowrap text-linen group-hover:block">
+                  {fmtINR(d.total)}
+                </span>
+                <div
+                  className={`w-full rounded-t ${d.isToday ? 'bg-ember' : 'bg-ember/60 group-hover:bg-ember/90'}`}
+                  style={{ height: `${d.total === 0 ? 2 : Math.max((d.total / maxDay) * 100, 4)}%` }}
+                />
+                <span
+                  className={`mt-1.5 text-center font-mono text-[9px] ${d.isToday ? 'text-ember' : 'text-moth/70'}`}
+                >
+                  {d.label}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       <section className="grid gap-4 md:grid-cols-2">
         <div className="rounded-xl border border-seam bg-veil/50 p-4">
           <h2 className="mb-3 text-xs font-medium tracking-widest text-moth uppercase">
@@ -262,7 +315,7 @@ export default async function FinancePage() {
           {slices.length === 0 ? (
             <p className="text-sm text-moth">No expenses logged this month yet.</p>
           ) : (
-            <div className="flex items-center gap-5">
+            <div className="flex flex-col items-center gap-5 sm:flex-row">
               <div className="relative">
                 <Donut slices={slices} total={monthSpend} />
                 <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
@@ -270,7 +323,7 @@ export default async function FinancePage() {
                   <span className="text-[10px] text-moth">spent</span>
                 </div>
               </div>
-              <ul className="min-w-0 flex-1 space-y-1.5 text-xs">
+              <ul className="w-full min-w-0 flex-1 space-y-1.5 text-xs">
                 {slices.map((s) => (
                   <li key={s.label} className="flex items-center gap-2">
                     <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: s.color }} aria-hidden />
@@ -397,58 +450,6 @@ export default async function FinancePage() {
           <ul className="divide-y divide-seam/60 rounded-xl border border-seam bg-veil/50">
             {allRecurring.map((r) => (
               <RecurringRow key={r.id} item={r as Recurring} />
-            ))}
-          </ul>
-        )}
-      </section>
-
-      <section>
-        <h2 className="mb-3 text-xs font-medium tracking-widest text-moth uppercase">
-          Daily spend · last 14 days
-        </h2>
-        <div className="rounded-xl border border-seam bg-veil/50 px-4 pt-6 pb-3">
-          <div className="flex h-32 items-end gap-[3px]">
-            {days.map((d) => (
-              <div key={d.key} className="group relative flex h-full flex-1 flex-col justify-end">
-                <span className="pointer-events-none absolute -top-5 left-1/2 z-10 hidden -translate-x-1/2 rounded bg-night px-1.5 py-0.5 font-mono text-[10px] whitespace-nowrap text-linen group-hover:block">
-                  {fmtINR(d.total)}
-                </span>
-                <div
-                  className={`w-full rounded-t ${d.isToday ? 'bg-ember' : 'bg-ember/60 group-hover:bg-ember/90'}`}
-                  style={{ height: `${d.total === 0 ? 2 : Math.max((d.total / maxDay) * 100, 4)}%` }}
-                />
-                <span
-                  className={`mt-1.5 text-center font-mono text-[9px] ${d.isToday ? 'text-ember' : 'text-moth/70'}`}
-                >
-                  {d.label}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section>
-        <h2 className="mb-3 text-xs font-medium tracking-widest text-moth uppercase">Today</h2>
-        {today.length === 0 ? (
-          <p className="text-sm text-moth">Nothing logged yet today.</p>
-        ) : (
-          <ul className="divide-y divide-seam/60 rounded-xl border border-seam bg-veil/50">
-            {today.map((t) => (
-              <li key={t.id} className="flex items-center gap-3 px-4 py-3 text-sm">
-                <span className="w-20 shrink-0 font-mono text-linen/95">
-                  {t.type === 'income' ? <span className="text-sage">+</span> : ''}
-                  {fmtINR(Number(t.amount))}
-                </span>
-                <span className="rounded-full bg-seam/80 px-2 py-0.5 text-[10px] text-moth">
-                  {t.category}
-                </span>
-                <span className="flex-1 truncate text-moth">{t.note}</span>
-                <span className="shrink-0 font-mono text-xs text-moth/70">
-                  {t.ts.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })}
-                </span>
-                <TxDelete id={t.id} />
-              </li>
             ))}
           </ul>
         )}

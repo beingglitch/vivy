@@ -148,6 +148,35 @@ export const recurring = pgTable('recurring', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+// Interest areas for paper suggestions. Weight is the interest score the
+// feedback loop adjusts — reading bumps it, skipping decays it. Over months the
+// weights ARE the answer to "what am I actually into".
+export const topics = pgTable('topics', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  name: text('name').notNull().unique(),
+  query: text('query').notNull(), // arXiv search_query
+  weight: numeric('weight', { precision: 6, scale: 2 }).notNull().default('1'),
+  active: boolean('active').notNull().default(true),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Suggested/read research papers (arXiv). Reading one creates a `learning` row
+// (kind 'paper') and links back via learningId.
+export const papers = pgTable('papers', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  arxivId: text('arxiv_id').notNull().unique(),
+  topicId: uuid('topic_id').references(() => topics.id),
+  title: text('title').notNull(),
+  authors: text('authors'),
+  summary: text('summary'),
+  url: text('url').notNull(),
+  published: timestamp('published', { withTimezone: true }),
+  status: text('status').notNull().default('suggested'), // 'suggested' | 'reading' | 'skipped' | 'done'
+  why: text('why'), // Haiku's one-liner: why this matters to me
+  learningId: uuid('learning_id').references(() => learning.id),
+  suggestedAt: timestamp('suggested_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const chatMessages = pgTable('chat_messages', {
   id: uuid('id').defaultRandom().primaryKey(),
   role: text('role').notNull(), // 'user' | 'assistant'

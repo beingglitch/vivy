@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 
 type Item = {
   id: string;
-  kind: 'book' | 'course';
+  kind: 'book' | 'course' | 'paper';
   title: string;
   author: string | null;
   status: string;
@@ -128,7 +128,7 @@ function ProgressRow({ item }: { item: Item }) {
           (each row is its own grid, so shared alignment needs fixed widths).
           Small screens fall back to wrapping flex. */}
       <div className="flex flex-wrap items-center gap-3 text-sm sm:grid sm:grid-cols-[minmax(0,1fr)_9.5rem_6.5rem_1.25rem_1.25rem]">
-        <span className="min-w-0 flex-1 truncate text-linen/90" title={item.title}>
+        <span className="w-full min-w-0 truncate text-linen/90 sm:w-auto" title={item.title}>
           {item.title}
           {item.author && <span className="ml-2 text-xs text-moth">{item.author}</span>}
         </span>
@@ -190,12 +190,12 @@ function ProgressRow({ item }: { item: Item }) {
   );
 }
 
-function AddForm({ kind }: { kind: 'book' | 'course' }) {
+function AddForm({ kind }: { kind: 'book' | 'course' | 'paper' }) {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [author, setAuthor] = useState('');
   const [total, setTotal] = useState('');
-  const [unit, setUnit] = useState(kind === 'book' ? 'chapter' : 'lesson');
+  const [unit, setUnit] = useState(kind === 'book' ? 'chapter' : kind === 'paper' ? 'section' : 'lesson');
   const [busy, setBusy] = useState(false);
   const router = useRouter();
 
@@ -273,7 +273,7 @@ function AddForm({ kind }: { kind: 'book' | 'course' }) {
 }
 
 export function LearningList({ initial }: { initial: Item[] }) {
-  function section(kind: 'book' | 'course', label: string) {
+  function section(kind: 'book' | 'course' | 'paper', label: string) {
     const items = initial.filter((i) => i.kind === kind);
     const active = items.filter((i) => i.status === 'active');
     const backlog = items.filter((i) => i.status === 'backlog');
@@ -320,8 +320,10 @@ export function LearningList({ initial }: { initial: Item[] }) {
     );
   }
 
+  const hasPapers = initial.some((i) => i.kind === 'paper');
   return (
     <div className="space-y-10">
+      {hasPapers && section('paper', 'Papers')}
       {section('book', 'Books')}
       {section('course', 'Courses')}
     </div>

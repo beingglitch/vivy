@@ -1,8 +1,8 @@
 import Link from 'next/link';
 import { and, desc, eq, gte, sql } from 'drizzle-orm';
-import { db, briefs, events, learning, tasks, transactions } from '@/lib/db';
+import { db, briefs, events, learning, positions, tasks, transactions } from '@/lib/db';
 import { browsingStats, fmtDuration } from '@/lib/browsing';
-import { fmtINR } from '@/lib/finance';
+import { fmtINR, fmtINRShort } from '@/lib/finance';
 
 export const dynamic = 'force-dynamic';
 
@@ -103,10 +103,21 @@ export default async function Dashboard() {
   const dayStart = new Date();
   dayStart.setHours(0, 0, 0, 0);
   const twoWeeksAgo = new Date(dayStart.getTime() - 13 * DAY);
-  const weekAgo = new Date(dayStart.getTime() - 6 * DAY);
+  const monthStart = new Date(dayStart);
+  monthStart.setDate(1);
 
-  const [browserEvents, doneTasks, learnLogs, spendRows, openCount, activeLearning, latestBrief, todayStats] =
-    await Promise.all([
+  const [
+    browserEvents,
+    doneTasks,
+    learnLogs,
+    spendRows,
+    openCount,
+    activeLearning,
+    latestBrief,
+    todayStats,
+    allPositions,
+    monthAgg,
+  ] = await Promise.all([
       db
         .select({ ts: events.ts, type: events.type, payload: events.payload })
         .from(events)
@@ -136,7 +147,27 @@ export default async function Dashboard() {
         .limit(6),
       db.select().from(briefs).orderBy(desc(briefs.day)).limit(1),
       browsingStats(dayStart),
-    ]);
+      db.select().from(positions),
+      // month-to-date rollups for the daily/monthly stat tiles, in one round trip
+      db
+        .select({
+          screenSec: sql<string>`coalesce(sum((${events.payload}->>'seconds')::numeric) filter (where ${events.source} = 'browser' and ${events.ts} >= ${monthStart}), 0)`,
+          units: sql<string>`coalesce(sum((${events.payload}->>'units')::numeric) filter (where ${events.type} = 'learning.log' and ${events.ts} >= ${monthStart}), 0)`,
+        })
+        .from(events)
+        .where(gte(events.ts, monthStart)),
+      ]);
+
+  const [monthSpendRow, monthDoneRow] = await Promise.all([
+    db
+      .select({ total: sql<string>`coalesce(sum(${transactions.amount}), 0)` })
+      .from(transactions)
+      .where(and(gte(transactions.ts, monthStart), eq(transactions.type, 'expense'))),
+    db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(tasks)
+      .where(and(eq(tasks.status, 'done'), gte(tasks.completedAt, monthStart))),
+  ]);
 
   // Bucket everything into IST days.
   const screenDays = makeDays(14);
@@ -168,18 +199,28 @@ export default async function Dashboard() {
     if (b) b.value += Number(t.amount);
   }
 
-  const chaptersThisWeek = learnLogs
-    .filter((l) => l.ts >= weekAgo)
-    .reduce((s, l) => s + Number((l.payload as Record<string, unknown>).units ?? 0), 0);
   const spendToday = spendDays[spendDays.length - 1].value;
   const brief = latestBrief[0];
   const maxDomain = Math.max(...todayStats.domains.map((d) => d.seconds), 1);
 
+  // The one number Vivy exists to move: net worth, from live positions.
+  const considered = allPositions.filter((p) => p.consider);
+  const ownTotal = considered.filter((p) => p.kind === 'asset').reduce((s, p) => s + Number(p.value), 0);
+  const oweTotal = considered.filter((p) => p.kind === 'liability').reduce((s, p) => s + Number(p.value), 0);
+  const netWorth = ownTotal - oweTotal;
+
+  const monthScreen = Number(monthAgg[0]?.screenSec ?? 0);
+  const monthUnits = Number(monthAgg[0]?.units ?? 0);
+  const monthSpend = Number(monthSpendRow[0]?.total ?? 0);
+  const monthDone = monthDoneRow[0]?.n ?? 0;
+  const unitsToday = readDays[readDays.length - 1].value;
+
+  // Each tile: today's number big, this month's beneath it.
   const tiles = [
-    { label: 'screen today', value: fmtDuration(screenDays[13].value) },
-    { label: 'open tasks', value: String(openCount[0]?.n ?? 0) },
-    { label: 'chapters this week', value: String(chaptersThisWeek) },
-    { label: 'spent today', value: fmtINR(spendToday) },
+    { label: 'screen today', value: fmtDuration(screenDays[13].value), month: `${fmtDuration(monthScreen)} this month` },
+    { label: 'open tasks', value: String(openCount[0]?.n ?? 0), month: `${monthDone} done this month` },
+    { label: 'chapters today', value: String(unitsToday), month: `${monthUnits} this month` },
+    { label: 'spent today', value: fmtINR(spendToday), month: `${fmtINR(monthSpend)} this month` },
   ];
 
   return (
@@ -196,11 +237,30 @@ export default async function Dashboard() {
         </h1>
       </section>
 
+      {/* The mission number. Everything else on this page is in service of moving it up. */}
+      <Link
+        href="/finance"
+        className="block rounded-xl border border-seam bg-veil/50 px-4 py-6 text-center transition-colors hover:border-ember/40"
+      >
+        <p className="text-xs font-medium tracking-widest text-moth uppercase">Net worth</p>
+        <p
+          className={`mt-1.5 font-mono text-4xl tracking-tight sm:text-5xl ${netWorth >= 0 ? 'text-sage' : 'text-rose'}`}
+        >
+          {netWorth < 0 ? '−' : ''}
+          {fmtINR(Math.abs(netWorth))}
+        </p>
+        <p className="mt-2 text-xs text-moth">
+          own <span className="font-mono text-sage">{fmtINRShort(ownTotal)}</span> · owe{' '}
+          <span className="font-mono text-rose">{fmtINRShort(oweTotal)}</span> · the goal is up →
+        </p>
+      </Link>
+
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {tiles.map((t) => (
           <div key={t.label} className="rounded-xl border border-seam bg-veil/50 px-4 py-3">
             <p className="font-mono text-xl text-linen">{t.value}</p>
             <p className="mt-0.5 text-xs text-moth">{t.label}</p>
+            <p className="mt-1 font-mono text-[10px] text-moth/70">{t.month}</p>
           </div>
         ))}
       </section>

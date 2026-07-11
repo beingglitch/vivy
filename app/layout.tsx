@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 import { Fraunces, Instrument_Sans, Geist_Mono } from "next/font/google";
+import { VivyFab } from "./vivy-fab";
 import "./globals.css";
 
 // Her voice — a soft, warm serif. UI stays in a quiet sans; numbers in mono.
@@ -50,7 +51,9 @@ export default function RootLayout({
     >
       <body className="flex min-h-full flex-col font-sans">
         <header className="border-b border-seam/70">
-          <nav className="mx-auto flex max-w-4xl items-center gap-6 px-4 py-3 text-sm">
+          {/* overflow-x-auto keeps the nav itself scrollable on narrow phones instead
+              of widening the page and giving everything a horizontal scrollbar. */}
+          <nav className="mx-auto flex max-w-4xl items-center gap-5 overflow-x-auto px-4 py-3 text-sm whitespace-nowrap sm:gap-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <Link href="/" className="flex items-center gap-2">
               <span className="presence h-2 w-2 rounded-full bg-ember" aria-hidden />
               <span className="font-voice text-lg italic tracking-wide text-linen">Vivy</span>
@@ -68,7 +71,8 @@ export default function RootLayout({
             </div>
           </nav>
         </header>
-        <div className="mx-auto w-full max-w-4xl flex-1 px-4 py-8">{children}</div>
+        <div className="mx-auto w-full max-w-4xl flex-1 px-4 py-8 pb-24">{children}</div>
+        <VivyFab />
       </body>
     </html>
   );

@@ -37,6 +37,8 @@ Next.js + TypeScript app, Neon Postgres, Drizzle, deployed on Vercel from day on
 - [x] [x] Single-user auth (passcode → HMAC session cookie, proxy.ts wall) — verified: 401/redirect unauthed, 200 authed
 - [x] [x] PWA: manifest + icons (public past the auth wall) + apple meta, installable — manifest/icon 200-verified 2026-07-11 [[SPEC-0003]]
 - [x] [x] Chart-first dashboard (stat tiles, collapsed brief, 2×2 14-day trend grid, domains + learning progress) — screenshot-verified 2026-07-11
+- [x] [x] Home net-worth hero (full-width, links to /finance) + daily/monthly on every stat tile — 390px screenshot-verified 2026-07-11
+- [x] [x] Mobile fit: nav self-scrolls (was widening the page), donut legend stacks, position bars wrap — 390px screenshot-verified 2026-07-11
 
 ### Event API — the one pipe [[SPEC-0001]]
 Every ingestor (browser, screen agent, finance, recorder) POSTs to this. The timeline table.
@@ -66,6 +68,7 @@ The Jarvis moment: every morning Vivy decides and tells me the plan.
 Conversational interface over all my data, with tools.
 
 - [x] [ ] Chat UI (streaming) at /chat, history persisted in chat_messages — built 2026-07-08; gateway blocked
+- [x] [ ] Voice chat overlay [[SPEC-0004]]: bottom-right FAB on every page, safety mode (review draft → say "go" / oral correction via Haiku), spoken replies toggle — built 2026-07-11; needs real-mic test by user
 - [x] [ ] Vivy tools: queryTasks, createTask, completeTask, queryEvents, remember — built; untested
 - [x] [ ] Persistent memory: `remember` tool writes memories; injected into chat + brief prompts
 
@@ -78,6 +81,9 @@ One `learning` concept (kind: book|course), unit-based progress, coached in the 
 - [x] [ ] Chat tools: logLearning / addLearning / queryLearning — built, untested in chat
 - [x] [ ] Unit picker (chapter/page/section/lesson/module/hour/video/episode) on add + edit forms — built 2026-07-11
 - [x] [x] Straight columns on /learning (fixed grid tracks per row) — screenshot-verified 2026-07-11
+- [x] [x] Research papers [[SPEC-0005]]: topics (7 seeded, weighted, editable) + arXiv fetch + Haiku picks w/ why-lines + links — real run 2026-07-11: 7 papers suggested, all topics covered
+- [x] [x] Paper feedback loop: start-reading → learning kind 'paper' + topic weight +1; skip → −0.2 — API-verified 2026-07-11 (weight 1.0→2.0, learning row created)
+- [x] [ ] Daily paper suggestions via cron (piggybacked on daily-summary) — wired; first prod run pending deploy
 
 ### Finance — manual entry (interim; auto-ingestion is the designed flow) [[SPEC-0002]] [[SPEC-0003]]
 - [x] [x] `transactions` table + /finance page (amount+category+note, today list, month by category) — curl-verified 2026-07-11

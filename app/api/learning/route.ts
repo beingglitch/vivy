@@ -14,8 +14,8 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
-  if (!body?.title || !['book', 'course'].includes(body.kind)) {
-    return NextResponse.json({ error: 'kind (book|course) and title required' }, { status: 400 });
+  if (!body?.title || !['book', 'course', 'paper'].includes(body.kind)) {
+    return NextResponse.json({ error: 'kind (book|course|paper) and title required' }, { status: 400 });
   }
   const [row] = await db
     .insert(learning)
@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
       author: body.author ?? null,
       url: body.url ?? null,
       status: body.status ?? 'backlog',
-      unitName: body.unitName ?? (body.kind === 'book' ? 'chapter' : 'lesson'),
+      unitName: body.unitName ?? (body.kind === 'book' ? 'chapter' : body.kind === 'paper' ? 'section' : 'lesson'),
       unitsTotal: body.unitsTotal ?? null,
       startedAt: body.startedAt ?? null,
     })
