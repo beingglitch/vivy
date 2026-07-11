@@ -48,7 +48,7 @@ Every ingestor (browser, screen agent, finance, recorder) POSTs to this. The tim
 - [x] [x] `events` table: id, ts, source, type, title, payload (jsonb), processed flag
 - [x] [x] `POST /api/events` with API-key auth, single or batch (1–500) — curl-verified local + prod
 - [x] [x] `GET /api/events` timeline query (source/type/since/limit) — curl-verified
-- [x] [x] Processing loop: unprocessed events → AI handler by type → derived records. `lib/ai/process-events.ts` (Haiku), runs after each text-event ingest (`after()`) + `/api/cron/process`. Verified 2026-07-08 after gateway unlock: 3 analyzed, 2 correct tasks proposed, 0 errors
+- [x] [x] Processing loop: unprocessed events → AI handler by type → derived records. `lib/ai/process-events.ts` (Haiku), runs after each text-event ingest (`after()`) + `/api/cron/process`. Verified 2026-07-08 after gateway unlock: 3 analyzed, 2 correct tasks proposed, 0 errors. 2026-07-13: fixed BUG-0001 (events over the 25-text/60-video per-run caps were marked processed without AI → silently dropped); re-verify against real data
 
 ### Task pipeline [[SPEC-0001]]
 Tasks are the first-class citizen: created manually, by chat, or extracted from any event.
@@ -101,7 +101,7 @@ One `learning` concept (kind: book|course), unit-based progress, coached in the 
 - [x] [ ] Voice input (Web Speech API) on chat + finance note — mic renders 2026-07-11; real dictation not yet tried
 - [ ] [ ] Replace manual with auto-ingestion (Epic 3: SMS/Gmail/bank) — manual stays as fallback
 
-**Bugs:** *(none open)*
+**Bugs:** BUG-0001 (resolved 2026-07-13) — processing loop marked over-cap text/video events processed without AI, silently dropping them; see `docs/bugs/BUG-0001-*`.
 
 ---
 

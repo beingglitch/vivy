@@ -100,10 +100,14 @@ export async function processEvents(max = 25) {
     .orderBy(asc(events.ts))
     .limit(200);
 
-  const textEvents = pending.filter((e) => TEXT_TYPES.has(e.type) && e.source !== 'ai').slice(0, max);
+  const isText = (e: typeof events.$inferSelect) => TEXT_TYPES.has(e.type) && e.source !== 'ai';
+  const textEvents = pending.filter(isText).slice(0, max);
   const videoEvents = pending.filter((e) => e.type === 'video.watch').slice(0, 60);
+  // "Rest" is pure analytics (page.visit, search, ai-sourced text…) that needs no AI —
+  // mark it processed. Text/video events OVER the per-run caps must NOT land here: they
+  // stay pending so the next run mines them, instead of being silently dropped.
   const restIds = pending
-    .filter((e) => !textEvents.includes(e) && !videoEvents.includes(e))
+    .filter((e) => !isText(e) && e.type !== 'video.watch')
     .map((e) => e.id);
 
   if (restIds.length > 0) {
