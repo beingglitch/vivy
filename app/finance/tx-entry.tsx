@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { TX_CATEGORIES, INCOME_CATEGORIES } from '@/lib/finance';
+import { VoiceButton } from '@/app/voice-button';
 
 // Speed is the whole design: type the amount, tap a category — saved.
 // The note is optional and never blocks the save.
@@ -61,6 +62,7 @@ export function TxEntry() {
           placeholder="note (optional)"
           className="min-w-0 flex-1 rounded-lg border border-seam bg-night px-3 py-2.5 text-sm text-linen placeholder:text-moth/40 outline-none transition-colors focus:border-ember/60"
         />
+        <VoiceButton onText={(t) => setNote((prev) => (prev ? `${prev} ${t}` : t))} />
       </div>
       <div className="flex flex-wrap items-center gap-1.5">
         <div className="mr-1 flex overflow-hidden rounded-full border border-seam text-[11px]">

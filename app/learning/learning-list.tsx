@@ -124,20 +124,25 @@ function ProgressRow({ item }: { item: Item }) {
 
   return (
     <li className="space-y-2 px-4 py-3">
-      <div className="flex items-center gap-3 text-sm">
-        <span className="flex-1 text-linen/90">
+      {/* Fixed grid tracks so the columns line up vertically across every row
+          (each row is its own grid, so shared alignment needs fixed widths).
+          Small screens fall back to wrapping flex. */}
+      <div className="flex flex-wrap items-center gap-3 text-sm sm:grid sm:grid-cols-[minmax(0,1fr)_9.5rem_6.5rem_1.25rem_1.25rem]">
+        <span className="min-w-0 flex-1 truncate text-linen/90" title={item.title}>
           {item.title}
           {item.author && <span className="ml-2 text-xs text-moth">{item.author}</span>}
         </span>
-        <span className="font-mono text-xs text-moth">
+        <span className="text-right font-mono text-xs whitespace-nowrap text-moth">
           {item.unitsDone}
           {item.unitsTotal ? `/${item.unitsTotal}` : ''} {item.unitName}s
           {pct !== null && <span className="ml-1 text-ember">{pct}%</span>}
         </span>
         {item.status === 'done' ? (
-          <span className="rounded-full bg-sage/15 px-2 py-0.5 text-[10px] text-sage">done</span>
+          <span className="justify-self-end rounded-full bg-sage/15 px-2 py-0.5 text-[10px] text-sage">
+            done
+          </span>
         ) : (
-          <form onSubmit={log} className="flex items-center gap-1">
+          <form onSubmit={log} className="flex items-center justify-end gap-1">
             <input
               value={units}
               onChange={(e) => setUnits(e.target.value)}
@@ -153,22 +158,24 @@ function ProgressRow({ item }: { item: Item }) {
             </button>
           </form>
         )}
-        {item.status !== 'done' && (
+        {item.status !== 'done' ? (
           <button
             onClick={async () => {
               await patchItem(item.id, { status: 'done' });
               router.refresh();
             }}
             title="Mark finished"
-            className="text-xs text-hush transition-colors hover:text-sage"
+            className="text-center text-xs text-hush transition-colors hover:text-sage"
           >
             ✓
           </button>
+        ) : (
+          <span aria-hidden />
         )}
         <button
           onClick={() => setEditing((v) => !v)}
           title="Edit"
-          className="text-xs text-hush transition-colors hover:text-linen"
+          className="text-center text-xs text-hush transition-colors hover:text-linen"
         >
           ✎
         </button>

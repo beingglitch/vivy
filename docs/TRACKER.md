@@ -77,14 +77,18 @@ One `learning` concept (kind: book|course), unit-based progress, coached in the 
 - [x] [x] Notion import: 8 books + 13 courses with real statuses (one-time, 2026-07-11)
 - [x] [ ] Chat tools: logLearning / addLearning / queryLearning — built, untested in chat
 - [x] [ ] Unit picker (chapter/page/section/lesson/module/hour/video/episode) on add + edit forms — built 2026-07-11
+- [x] [x] Straight columns on /learning (fixed grid tracks per row) — screenshot-verified 2026-07-11
 
 ### Finance — manual entry (interim; auto-ingestion is the designed flow) [[SPEC-0002]] [[SPEC-0003]]
 - [x] [x] `transactions` table + /finance page (amount+category+note, today list, month by category) — curl-verified 2026-07-11
 - [x] [ ] Chat tools: logExpense / queryFinance; brief mentions yesterday + 7d spend — built, untested
 - [x] [x] Income entry (spent/got toggle on quick entry) + money-flow card (in vs out, net) — rendered 2026-07-11
 - [x] [x] Donut chart of month-by-category (validated dark palette, legend w/ % + amounts) — screenshot-verified 2026-07-11
-- [x] [ ] Net worth: `positions` table (assets/liabilities, add/edit/remove) + headline number — built, APIs untested
-- [x] [ ] Recurring rules: `recurring` table + UI (add/edit/pause/remove) + next-month forecast — built, APIs untested
+- [x] [x] Net worth: `positions` table (assets/liabilities, consider flag, planned payments) + huge centered hero number — GET/PATCH curl-verified + screenshot 2026-07-11
+- [x] [x] Net-worth history: `networth_snapshots` (upsert on every position change + daily cron) + trend chart on /finance — seeded + rendered 2026-07-11
+- [x] [x] Notion "Finance Tracker" one-time import: 10 positions (incl. 5 personal debts, college fee not-counted) + 7 recurring rules — verified in DB + UI 2026-07-11
+- [x] [ ] Recurring rules: `recurring` table + UI (add/edit/pause/remove) + next-month forecast (recurring + planned debt payments + pace) — rows render; PATCH/DELETE untested
+- [x] [ ] Voice input (Web Speech API) on chat + finance note — mic renders 2026-07-11; real dictation not yet tried
 - [ ] [ ] Replace manual with auto-ingestion (Epic 3: SMS/Gmail/bank) — manual stays as fallback
 
 **Bugs:** *(none open)*

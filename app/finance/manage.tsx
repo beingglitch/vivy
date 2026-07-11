@@ -15,6 +15,8 @@ export type Position = {
   name: string;
   category: string;
   value: string;
+  consider: boolean;
+  nextOutflow: string | null;
   note: string | null;
 };
 
@@ -41,6 +43,8 @@ export function PositionRow({ item, max }: { item: Position; max: number }) {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(item.name);
   const [value, setValue] = useState(item.value);
+  const [next, setNext] = useState(item.nextOutflow ?? '');
+  const [consider, setConsider] = useState(item.consider);
   const [busy, setBusy] = useState(false);
   const router = useRouter();
   const v = Number(item.value);
@@ -52,6 +56,8 @@ export function PositionRow({ item, max }: { item: Position; max: number }) {
     await call(`/api/positions/${item.id}`, 'PATCH', {
       name: name.trim() || item.name,
       value: Number(value),
+      nextOutflow: Number(next) > 0 ? Number(next) : null,
+      consider,
     });
     setBusy(false);
     setEditing(false);
@@ -59,11 +65,24 @@ export function PositionRow({ item, max }: { item: Position; max: number }) {
   }
 
   return (
-    <li className="space-y-1.5 px-4 py-2.5">
+    <li className={`space-y-1.5 px-4 py-2.5 ${item.consider ? '' : 'opacity-60'}`}>
       <div className="flex items-center gap-3 text-sm">
-        <span className="w-32 shrink-0 truncate text-moth" title={item.name}>
+        <span className="w-32 shrink-0 truncate text-moth" title={item.note ?? item.name}>
           {item.name}
         </span>
+        {!item.consider && (
+          <span className="shrink-0 rounded-full bg-seam/80 px-2 py-0.5 text-[10px] text-moth/80">
+            not counted
+          </span>
+        )}
+        {item.nextOutflow && Number(item.nextOutflow) > 0 && (
+          <span
+            className="shrink-0 rounded-full bg-ember/15 px-2 py-0.5 font-mono text-[10px] text-ember"
+            title="Planned payment next month"
+          >
+            {fmtINR(Number(item.nextOutflow))} next mo
+          </span>
+        )}
         <div className="h-2 flex-1 overflow-hidden rounded-full bg-seam/60">
           <div
             className={`h-full rounded-r-full ${barColor}`}
@@ -90,6 +109,20 @@ export function PositionRow({ item, max }: { item: Position; max: number }) {
             inputMode="decimal"
             className={`w-28 font-mono ${inputCls}`}
           />
+          {item.kind === 'liability' && (
+            <input
+              value={next}
+              onChange={(e) => setNext(e.target.value)}
+              placeholder="₹ next mo"
+              inputMode="decimal"
+              title="Planned payment next month"
+              className={`w-24 font-mono ${inputCls}`}
+            />
+          )}
+          <label className="flex items-center gap-1.5 text-xs text-moth">
+            <input type="checkbox" checked={consider} onChange={(e) => setConsider(e.target.checked)} />
+            counted
+          </label>
           <button disabled={busy} className={primaryBtn}>
             Save
           </button>

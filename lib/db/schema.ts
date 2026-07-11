@@ -114,10 +114,23 @@ export const positions = pgTable('positions', {
   id: uuid('id').defaultRandom().primaryKey(),
   kind: text('kind').notNull(), // 'asset' | 'liability'
   name: text('name').notNull(),
-  category: text('category').notNull().default('other'), // 'cash' | 'bank' | 'investment' | 'property' | 'loan' | 'credit' | 'other'
-  value: numeric('value', { precision: 14, scale: 2 }).notNull(), // INR
+  category: text('category').notNull().default('other'), // see POSITION_CATEGORIES in lib/finance
+  value: numeric('value', { precision: 14, scale: 2 }).notNull(), // INR; for liabilities = outstanding
+  consider: boolean('consider').notNull().default(true), // false = shown but kept out of net worth (e.g. college fee)
+  nextOutflow: numeric('next_outflow', { precision: 12, scale: 2 }), // planned payment toward this next month, if any
   note: text('note'),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// One row per day: net worth as it stood. Written on every position change and
+// by the daily cron, so the trend line grows even when nothing is edited.
+export const networthSnapshots = pgTable('networth_snapshots', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  day: date('day').notNull().unique(),
+  assets: numeric('assets', { precision: 14, scale: 2 }).notNull(),
+  liabilities: numeric('liabilities', { precision: 14, scale: 2 }).notNull(), // considered only
+  net: numeric('net', { precision: 14, scale: 2 }).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 

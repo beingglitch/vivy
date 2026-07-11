@@ -1,5 +1,5 @@
-import { and, desc, eq, gte, sql } from 'drizzle-orm';
-import { db, positions, recurring, transactions } from '@/lib/db';
+import { and, asc, desc, eq, gte, sql } from 'drizzle-orm';
+import { db, networthSnapshots, positions, recurring, transactions } from '@/lib/db';
 import { CATEGORY_COLORS, FOLD_COLOR, fmtINR, fmtINRShort } from '@/lib/finance';
 import { TxEntry, TxDelete } from './tx-entry';
 import { PositionRow, AddPosition, RecurringRow, AddRecurring } from './manage';
@@ -46,6 +46,66 @@ function Donut({ slices, total }: { slices: { label: string; value: number; colo
   );
 }
 
+// Net worth over time — one series, so no legend; the hero number above names it.
+// Dashed line marks zero: above it you own more than you owe.
+function NetWorthTrend({ points }: { points: { day: string; net: number }[] }) {
+  const W = 640;
+  const H = 150;
+  const PAD = 10;
+  const nets = points.map((p) => p.net);
+  let min = Math.min(...nets, 0);
+  let max = Math.max(...nets, 0);
+  const span = max - min || 1;
+  min -= span * 0.08;
+  max += span * 0.08;
+  const x = (i: number) => (points.length === 1 ? W / 2 : PAD + (i / (points.length - 1)) * (W - 2 * PAD));
+  const y = (v: number) => H - PAD - ((v - min) / (max - min)) * (H - 2 * PAD);
+  const zeroY = y(0);
+  const line = points.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(p.net).toFixed(1)}`).join(' ');
+  const area = `${line} L${x(points.length - 1).toFixed(1)},${zeroY.toFixed(1)} L${x(0).toFixed(1)},${zeroY.toFixed(1)} Z`;
+  const color = points[points.length - 1].net >= 0 ? 'var(--color-sage)' : 'var(--color-rose)';
+  const fmtDay = (d: string) =>
+    new Date(d + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+
+  return (
+    <div>
+      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Net worth over time" className="w-full">
+        <line x1={PAD} y1={zeroY} x2={W - PAD} y2={zeroY} stroke="var(--color-seam)" strokeDasharray="4 4" />
+        <text x={W - PAD} y={zeroY - 4} textAnchor="end" fontSize="10" fill="var(--color-moth)" opacity="0.7">
+          ₹0
+        </text>
+        {points.length > 1 && (
+          <>
+            <path d={area} fill={color} opacity="0.12" />
+            <path d={line} fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+          </>
+        )}
+        {points.map((p, i) => (
+          <circle
+            key={p.day}
+            cx={x(i)}
+            cy={y(p.net)}
+            r={i === points.length - 1 ? 4 : 2.5}
+            fill={color}
+            stroke="var(--color-veil)"
+            strokeWidth={i === points.length - 1 ? 2 : 0}
+          >
+            <title>{`${fmtDay(p.day)}: ${p.net < 0 ? '−' : ''}${fmtINR(Math.abs(p.net))}`}</title>
+          </circle>
+        ))}
+      </svg>
+      <div className="flex justify-between font-mono text-[10px] text-moth/70">
+        <span>{fmtDay(points[0].day)}</span>
+        {points.length === 1 ? (
+          <span>day one — the line grows from here, one point a day</span>
+        ) : (
+          <span>{fmtDay(points[points.length - 1].day)}</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default async function FinancePage() {
   const now = new Date();
   const dayStart = new Date(now);
@@ -55,7 +115,7 @@ export default async function FinancePage() {
   const twoWeeksAgo = new Date(dayStart.getTime() - 13 * DAY);
   const thirtyAgo = new Date(dayStart.getTime() - 30 * DAY);
 
-  const [today, byCategory, monthIncome, recent, monthPace, allPositions, allRecurring] =
+  const [today, byCategory, monthIncome, recent, monthPace, allPositions, allRecurring, snapshots] =
     await Promise.all([
       db.select().from(transactions).where(gte(transactions.ts, dayStart)).orderBy(desc(transactions.ts)).limit(50),
       db
@@ -82,6 +142,7 @@ export default async function FinancePage() {
         .where(and(gte(transactions.ts, thirtyAgo), eq(transactions.type, 'expense'))),
       db.select().from(positions).orderBy(desc(positions.value)),
       db.select().from(recurring).orderBy(desc(recurring.amount)),
+      db.select().from(networthSnapshots).orderBy(asc(networthSnapshots.day)).limit(365),
     ]);
 
   // ---- month numbers ----
@@ -98,13 +159,18 @@ export default async function FinancePage() {
     ...(foldTotal > 0 ? [{ label: 'everything else', value: foldTotal, color: FOLD_COLOR }] : []),
   ];
 
-  // ---- net worth ----
+  // ---- net worth (only `consider` positions count; excluded ones still show) ----
   const assets = allPositions.filter((p) => p.kind === 'asset') as Position[];
   const liabilities = allPositions.filter((p) => p.kind === 'liability') as Position[];
-  const assetTotal = assets.reduce((s, p) => s + Number(p.value), 0);
-  const liabilityTotal = liabilities.reduce((s, p) => s + Number(p.value), 0);
+  const assetTotal = assets.filter((p) => p.consider).reduce((s, p) => s + Number(p.value), 0);
+  const liabilityTotal = liabilities.filter((p) => p.consider).reduce((s, p) => s + Number(p.value), 0);
   const netWorth = assetTotal - liabilityTotal;
+  const excludedTotal = allPositions
+    .filter((p) => !p.consider)
+    .reduce((s, p) => s + Number(p.value) * (p.kind === 'asset' ? 1 : -1), 0);
   const maxPosition = Math.max(...allPositions.map((p) => Number(p.value)), 1);
+  const plannedPayments = liabilities.reduce((s, p) => s + Number(p.nextOutflow ?? 0), 0);
+  const trend = snapshots.map((s) => ({ day: s.day, net: Number(s.net) }));
 
   // ---- recurring + forecast ----
   const activeRec = allRecurring.filter((r) => r.active);
@@ -115,7 +181,7 @@ export default async function FinancePage() {
     ? Math.max(Math.min((Date.now() - new Date(monthPace[0].first).getTime()) / DAY, 30), 1)
     : 0;
   const variableMonthly = paceDays ? (Number(monthPace[0].total) / paceDays) * 30 : 0;
-  const forecast = recurringExp + variableMonthly;
+  const forecast = recurringExp + plannedPayments + variableMonthly;
 
   // ---- daily spend, last 14 days (IST) ----
   const days: { key: string; label: string; total: number; isToday: boolean }[] = [];
@@ -152,13 +218,38 @@ export default async function FinancePage() {
             <p className="font-mono text-lg text-linen">{fmtINR(monthSpend)}</p>
             <p className="text-xs text-moth">this month</p>
           </div>
-          <div>
-            <p className={`font-mono text-lg ${netWorth >= 0 ? 'text-sage' : 'text-rose'}`}>
-              {fmtINRShort(Math.abs(netWorth))}
-            </p>
-            <p className="text-xs text-moth">net worth</p>
-          </div>
         </div>
+      </section>
+
+      {/* The number that matters most, front and center. */}
+      <section className="rounded-xl border border-seam bg-veil/50 px-4 pt-8 pb-4 text-center">
+        <p className="text-xs font-medium tracking-widest text-moth uppercase">Net worth</p>
+        <p
+          className={`mt-2 font-mono text-5xl tracking-tight sm:text-6xl ${netWorth >= 0 ? 'text-sage' : 'text-rose'}`}
+        >
+          {netWorth < 0 ? '−' : ''}
+          {fmtINR(Math.abs(netWorth))}
+        </p>
+        <p className="mt-3 text-xs text-moth">
+          own <span className="font-mono text-sage">{fmtINR(assetTotal)}</span> · owe{' '}
+          <span className="font-mono text-rose">{fmtINR(liabilityTotal)}</span>
+          {excludedTotal !== 0 && (
+            <span className="text-moth/60">
+              {' '}
+              · not counting {fmtINRShort(Math.abs(excludedTotal))} excluded (with it{' '}
+              <span className="font-mono">
+                {netWorth + excludedTotal < 0 ? '−' : ''}
+                {fmtINRShort(Math.abs(netWorth + excludedTotal))}
+              </span>
+              )
+            </span>
+          )}
+        </p>
+        {trend.length > 0 && (
+          <div className="mt-5">
+            <NetWorthTrend points={trend} />
+          </div>
+        )}
       </section>
 
       <TxEntry />
@@ -234,8 +325,10 @@ export default async function FinancePage() {
             </h2>
             <p className="font-mono text-xl text-linen">{fmtINR(Math.round(forecast))}</p>
             <p className="mt-1 text-xs text-moth">
-              {fmtINR(recurringExp)} committed (recurring) + {fmtINR(Math.round(variableMonthly))} variable at
-              your current pace{recurringInc > 0 ? ` · ${fmtINR(recurringInc)}/mo recurring income` : ''}
+              {fmtINR(recurringExp)} recurring
+              {plannedPayments > 0 ? ` + ${fmtINR(plannedPayments)} debt payments` : ''} +{' '}
+              {fmtINR(Math.round(variableMonthly))} variable at your current pace
+              {recurringInc > 0 ? ` · ${fmtINR(recurringInc)}/mo income` : ''}
             </p>
             <p className="mt-1.5 text-[10px] text-moth/60">
               estimate from the last {Math.round(paceDays) || 0} day{Math.round(paceDays) === 1 ? '' : 's'} of

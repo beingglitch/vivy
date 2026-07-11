@@ -47,3 +47,24 @@ installs to the phone home screen as a PWA behind the existing passcode.
 - [x] Learning unit select (add + edit forms)
 - [x] PWA: manifest.ts, icons, proxy exclusions, apple meta
 - [x] Build + verify locally, restart :3005, screenshots
+
+## Addendum (2026-07-11, evening) — Notion import, hero net worth, trend, voice
+
+- **Notion "Finance Tracker" imported** (one-time, idempotent script): 2 assets
+  (SBI savings ₹5,266, One Card FD ₹2,451), 8 liabilities (SBI Card ₹23,671,
+  Amrit ₹15k, Himanshu ₹10k, Manish ₹5k, Gagan ₹5k, Amazon Pay Later ₹3,957,
+  One Card ₹0, College Fee ₹2.57L), 7 recurring rules (NirmaanOS +₹20k income;
+  Food 6k, Rent 5k, Travel 4k, Electricity 3k, Claude Code 2,250, YT 149).
+- Schema additions: `positions.consider` (College Fee shows but doesn't count —
+  mirrors Notion's Consider checkbox), `positions.next_outflow` (planned payment
+  next month, shown as an ember chip), `networth_snapshots` (one row/day; upsert
+  on every position mutation + piggy-backed on the daily-summary cron).
+- **Hero**: net worth is the page's single huge centered number (−₹54,911 at
+  import; −₹3.1L with college fee) with own/owe subline and a one-series trend
+  chart (dashed ₹0 baseline, per-point tooltips). Small net-worth header stat
+  removed (redundancy rule). Everything else kept as it was, per user.
+- Forecast now adds planned debt payments: recurring ₹20,399 + payments ₹42,000
+  + logged pace.
+- **Voice input**: `app/voice-button.tsx` (Web Speech API, en-IN, hidden where
+  unsupported) wired into chat composer + finance note field.
+- /learning rows switched from flex to fixed grid tracks so columns are straight.

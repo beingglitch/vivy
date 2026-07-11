@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { generateText } from 'ai';
 import { db, events } from '@/lib/db';
 import { browsingStats, fmtDuration } from '@/lib/browsing';
+import { snapshotNetWorth } from '@/lib/networth';
 import { VIVY_MODEL_FAST } from '@/lib/ai';
 
 export const maxDuration = 120;
@@ -13,6 +14,10 @@ export async function GET(req: NextRequest) {
   if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
+
+  // Piggy-back the daily net-worth snapshot on this cron so the trend line
+  // gets a point every day even when no position is edited.
+  await snapshotNetWorth().catch(() => {});
 
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
   const stats = await browsingStats(since);

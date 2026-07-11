@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useChat } from '@ai-sdk/react';
+import { VoiceButton } from '@/app/voice-button';
 
 type HistoryMessage = { id: string; role: 'user' | 'assistant'; text: string };
 
@@ -87,6 +88,7 @@ export function Chat({ history }: { history: HistoryMessage[] }) {
           autoFocus
           className="flex-1 rounded-lg border border-seam bg-veil px-3 py-2 text-sm text-linen placeholder:text-moth/50 outline-none transition-colors focus:border-ember/60"
         />
+        <VoiceButton onText={(t) => setInput((prev) => (prev ? `${prev} ${t}` : t))} />
         <button
           disabled={busy || !input.trim()}
           className="rounded-lg bg-ember px-4 py-2 text-sm font-medium text-night transition hover:brightness-110 disabled:opacity-50"

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { desc } from 'drizzle-orm';
 import { db, positions } from '@/lib/db';
+import { snapshotNetWorth } from '@/lib/networth';
 
 export async function GET() {
   const rows = await db.select().from(positions).orderBy(desc(positions.value)).limit(200);
@@ -16,6 +17,7 @@ export async function POST(req: NextRequest) {
       { status: 400 },
     );
   }
+  const nextOutflow = Number(body.nextOutflow);
   const [row] = await db
     .insert(positions)
     .values({
@@ -23,8 +25,11 @@ export async function POST(req: NextRequest) {
       name: body.name,
       category: body.category ?? 'other',
       value: value.toFixed(2),
+      consider: body.consider === false ? false : true,
+      nextOutflow: Number.isFinite(nextOutflow) && nextOutflow > 0 ? nextOutflow.toFixed(2) : null,
       note: body.note ?? null,
     })
     .returning();
+  await snapshotNetWorth();
   return NextResponse.json({ position: row });
 }

@@ -20,8 +20,8 @@ export const INCOME_CATEGORIES = [
 ] as const;
 
 export const POSITION_CATEGORIES = {
-  asset: ['cash', 'bank', 'investment', 'property', 'other'],
-  liability: ['loan', 'credit', 'borrowed', 'other'],
+  asset: ['bank', 'fd', 'stocks', 'shares', 'cash', 'property', 'other'],
+  liability: ['debt', 'credit', 'loan', 'other'],
 } as const;
 
 // Donut palette: deeper-chroma siblings of the site tokens, validated with the
