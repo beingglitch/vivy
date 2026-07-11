@@ -2,13 +2,14 @@
 
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { TX_CATEGORIES } from '@/lib/finance';
+import { TX_CATEGORIES, INCOME_CATEGORIES } from '@/lib/finance';
 
 // Speed is the whole design: type the amount, tap a category — saved.
 // The note is optional and never blocks the save.
 export function TxEntry() {
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
+  const [mode, setMode] = useState<'expense' | 'income'>('expense');
   const [busy, setBusy] = useState(false);
   const [flash, setFlash] = useState('');
   const amountRef = useRef<HTMLInputElement>(null);
@@ -24,11 +25,11 @@ export function TxEntry() {
     const res = await fetch('/api/transactions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ amount: n, category, note: note.trim() || null }),
+      body: JSON.stringify({ amount: n, category, type: mode, note: note.trim() || null }),
     });
     setBusy(false);
     if (res.ok) {
-      setFlash(`₹${n} · ${category} — saved`);
+      setFlash(`${mode === 'income' ? '+' : ''}₹${n} · ${category} — saved`);
       setAmount('');
       setNote('');
       amountRef.current?.focus();
@@ -61,8 +62,23 @@ export function TxEntry() {
           className="min-w-0 flex-1 rounded-lg border border-seam bg-night px-3 py-2.5 text-sm text-linen placeholder:text-moth/40 outline-none transition-colors focus:border-ember/60"
         />
       </div>
-      <div className="flex flex-wrap gap-1.5">
-        {TX_CATEGORIES.map((c) => (
+      <div className="flex flex-wrap items-center gap-1.5">
+        <div className="mr-1 flex overflow-hidden rounded-full border border-seam text-[11px]">
+          {(['expense', 'income'] as const).map((m) => (
+            <button
+              key={m}
+              onClick={() => setMode(m)}
+              className={
+                mode === m
+                  ? `px-2.5 py-1 font-medium ${m === 'income' ? 'bg-sage' : 'bg-ember'} text-night`
+                  : 'px-2.5 py-1 text-moth hover:text-linen'
+              }
+            >
+              {m === 'expense' ? 'spent' : 'got'}
+            </button>
+          ))}
+        </div>
+        {(mode === 'expense' ? TX_CATEGORIES : INCOME_CATEGORIES).map((c) => (
           <button
             key={c}
             onClick={() => save(c)}

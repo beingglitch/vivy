@@ -15,6 +15,9 @@ type Item = {
   startedAt: string | null;
 };
 
+// Progress is always "+N units"; the unit just names what N is for this item.
+const UNIT_NAMES = ['chapter', 'page', 'section', 'lesson', 'module', 'hour', 'video', 'episode'] as const;
+
 const inputCls =
   'rounded-lg border border-seam bg-night px-3 py-1.5 text-sm text-linen placeholder:text-moth/50 outline-none transition-colors focus:border-ember/60';
 const primaryBtn =
@@ -32,6 +35,7 @@ function EditForm({ item, onClose }: { item: Item; onClose: () => void }) {
   const [title, setTitle] = useState(item.title);
   const [author, setAuthor] = useState(item.author ?? '');
   const [total, setTotal] = useState(item.unitsTotal?.toString() ?? '');
+  const [unit, setUnit] = useState(item.unitName);
   const [busy, setBusy] = useState(false);
   const router = useRouter();
 
@@ -42,6 +46,7 @@ function EditForm({ item, onClose }: { item: Item; onClose: () => void }) {
       title: title.trim() || item.title,
       author: author.trim() || null,
       unitsTotal: Number(total) > 0 ? Number(total) : null,
+      unitName: unit,
     });
     setBusy(false);
     onClose();
@@ -68,10 +73,17 @@ function EditForm({ item, onClose }: { item: Item; onClose: () => void }) {
       <input
         value={total}
         onChange={(e) => setTotal(e.target.value)}
-        placeholder={`total ${item.unitName}s`}
+        placeholder={`total ${unit}s`}
         inputMode="numeric"
         className={`w-28 ${inputCls}`}
       />
+      <select value={unit} onChange={(e) => setUnit(e.target.value)} className={inputCls}>
+        {UNIT_NAMES.map((u) => (
+          <option key={u} value={u}>
+            {u}s
+          </option>
+        ))}
+      </select>
       <button disabled={busy} className={primaryBtn}>
         Save
       </button>
@@ -176,6 +188,7 @@ function AddForm({ kind }: { kind: 'book' | 'course' }) {
   const [title, setTitle] = useState('');
   const [author, setAuthor] = useState('');
   const [total, setTotal] = useState('');
+  const [unit, setUnit] = useState(kind === 'book' ? 'chapter' : 'lesson');
   const [busy, setBusy] = useState(false);
   const router = useRouter();
 
@@ -191,6 +204,7 @@ function AddForm({ kind }: { kind: 'book' | 'course' }) {
         title: title.trim(),
         author: author.trim() || null,
         unitsTotal: Number(total) > 0 ? Number(total) : null,
+        unitName: unit,
       }),
     });
     setTitle('');
@@ -230,10 +244,17 @@ function AddForm({ kind }: { kind: 'book' | 'course' }) {
       <input
         value={total}
         onChange={(e) => setTotal(e.target.value)}
-        placeholder={kind === 'book' ? '#chapters' : '#lessons'}
+        placeholder={`#${unit}s`}
         inputMode="numeric"
         className={`w-24 ${inputCls}`}
       />
+      <select value={unit} onChange={(e) => setUnit(e.target.value)} className={inputCls}>
+        {UNIT_NAMES.map((u) => (
+          <option key={u} value={u}>
+            {u}s
+          </option>
+        ))}
+      </select>
       <button disabled={busy} className={primaryBtn}>
         Add
       </button>

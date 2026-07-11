@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 import { Fraunces, Instrument_Sans, Geist_Mono } from "next/font/google";
 import "./globals.css";
@@ -23,6 +23,11 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Vivy",
   description: "My personal AI assistant",
+  appleWebApp: { capable: true, title: "Vivy", statusBarStyle: "black-translucent" },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#141218",
 };
 
 const nav = [

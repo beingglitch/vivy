@@ -35,6 +35,8 @@ Next.js + TypeScript app, Neon Postgres, Drizzle, deployed on Vercel from day on
 - [x] [x] Neon Postgres provisioned (Vercel Marketplace) + Drizzle wired; `drizzle-kit push` applied 2026-07-08
 - [x] [x] Deployed to Vercel production — https://vivy-sage.vercel.app — curl-verified 2026-07-08
 - [x] [x] Single-user auth (passcode → HMAC session cookie, proxy.ts wall) — verified: 401/redirect unauthed, 200 authed
+- [x] [x] PWA: manifest + icons (public past the auth wall) + apple meta, installable — manifest/icon 200-verified 2026-07-11 [[SPEC-0003]]
+- [x] [x] Chart-first dashboard (stat tiles, collapsed brief, 2×2 14-day trend grid, domains + learning progress) — screenshot-verified 2026-07-11
 
 ### Event API — the one pipe [[SPEC-0001]]
 Every ingestor (browser, screen agent, finance, recorder) POSTs to this. The timeline table.
@@ -74,10 +76,15 @@ One `learning` concept (kind: book|course), unit-based progress, coached in the 
 - [x] [x] Progress logs land as `learning.log` events; brief coaches on days-since-last-session
 - [x] [x] Notion import: 8 books + 13 courses with real statuses (one-time, 2026-07-11)
 - [x] [ ] Chat tools: logLearning / addLearning / queryLearning — built, untested in chat
+- [x] [ ] Unit picker (chapter/page/section/lesson/module/hour/video/episode) on add + edit forms — built 2026-07-11
 
-### Finance — manual entry (interim; auto-ingestion is the designed flow) [[SPEC-0002]]
+### Finance — manual entry (interim; auto-ingestion is the designed flow) [[SPEC-0002]] [[SPEC-0003]]
 - [x] [x] `transactions` table + /finance page (amount+category+note, today list, month by category) — curl-verified 2026-07-11
 - [x] [ ] Chat tools: logExpense / queryFinance; brief mentions yesterday + 7d spend — built, untested
+- [x] [x] Income entry (spent/got toggle on quick entry) + money-flow card (in vs out, net) — rendered 2026-07-11
+- [x] [x] Donut chart of month-by-category (validated dark palette, legend w/ % + amounts) — screenshot-verified 2026-07-11
+- [x] [ ] Net worth: `positions` table (assets/liabilities, add/edit/remove) + headline number — built, APIs untested
+- [x] [ ] Recurring rules: `recurring` table + UI (add/edit/pause/remove) + next-month forecast — built, APIs untested
 - [ ] [ ] Replace manual with auto-ingestion (Epic 3: SMS/Gmail/bank) — manual stays as fallback
 
 **Bugs:** *(none open)*
@@ -90,6 +97,7 @@ One `learning` concept (kind: book|course), unit-based progress, coached in the 
 - [x] [x] Chrome MV3 extension in `extension/`: YouTube watches (title/channel/seconds), searches (google/bing/ddg/yt), per-site time → batched `POST /api/events`. Verified in user's real Chrome 2026-07-08: video.watch with channel + time-by-site showing on /browsing
 - [x] [ ] AI daily summary (`/api/cron/daily-summary`, Vercel Cron 09:00 IST, Haiku) — gateway unlocked 2026-07-08 (card added); first real cron run pending
 - [x] [x] Watch-time analytics: `/browsing` page (videos, searches, time-by-site, 24h/7d/30d) — verified with synthetic events
+- [x] [x] AI video classification (education/entertainment/music/…, Haiku batch, cron every 4h) + "video time by type" band on /browsing + brief context — verified 2026-07-11: Friends→entertainment, Coinbase breakdown→tech, Akon→music
 
 ### Screen-time agent
 - [ ] [ ] Linux agent (active window + app time sampler) → events, auto-starts on boot

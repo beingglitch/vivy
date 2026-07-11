@@ -1,7 +1,9 @@
 import { and, desc, eq, gte, sql } from 'drizzle-orm';
-import { db, transactions } from '@/lib/db';
-import { fmtINR } from '@/lib/finance';
+import { db, positions, recurring, transactions } from '@/lib/db';
+import { CATEGORY_COLORS, FOLD_COLOR, fmtINR, fmtINRShort } from '@/lib/finance';
 import { TxEntry, TxDelete } from './tx-entry';
+import { PositionRow, AddPosition, RecurringRow, AddRecurring } from './manage';
+import type { Position, Recurring } from './manage';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,6 +13,39 @@ function dayKeyIST(d: Date): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(d);
 }
 
+// Donut of this month's spend. Categories with a fixed color get a segment;
+// the rest fold into "everything else" (they still show in the list below).
+function Donut({ slices, total }: { slices: { label: string; value: number; color: string }[]; total: number }) {
+  const R = 15.9155; // circumference = 100, so lengths are percentages
+  let start = 0;
+  const gap = slices.length > 1 ? 1 : 0;
+  return (
+    <svg viewBox="0 0 42 42" role="img" aria-label="Spend by category" className="h-44 w-44 shrink-0 -rotate-90">
+      <circle cx="21" cy="21" r={R} fill="none" stroke="var(--color-seam)" strokeWidth="5.5" opacity="0.4" />
+      {slices.map((s) => {
+        const len = (s.value / total) * 100;
+        const el = (
+          <circle
+            key={s.label}
+            cx="21"
+            cy="21"
+            r={R}
+            fill="none"
+            stroke={s.color}
+            strokeWidth="5.5"
+            strokeDasharray={`${Math.max(len - gap, 0.6)} ${100 - Math.max(len - gap, 0.6)}`}
+            strokeDashoffset={-start}
+          >
+            <title>{`${s.label}: ${fmtINR(s.value)} (${Math.round(len)}%)`}</title>
+          </circle>
+        );
+        start += len;
+        return el;
+      })}
+    </svg>
+  );
+}
+
 export default async function FinancePage() {
   const now = new Date();
   const dayStart = new Date(now);
@@ -18,32 +53,71 @@ export default async function FinancePage() {
   const monthStart = new Date(dayStart);
   monthStart.setDate(1);
   const twoWeeksAgo = new Date(dayStart.getTime() - 13 * DAY);
+  const thirtyAgo = new Date(dayStart.getTime() - 30 * DAY);
 
-  const [today, byCategory, monthTotal, recent] = await Promise.all([
-    db
-      .select()
-      .from(transactions)
-      .where(gte(transactions.ts, dayStart))
-      .orderBy(desc(transactions.ts))
-      .limit(50),
-    db
-      .select({ category: transactions.category, total: sql<string>`sum(${transactions.amount})` })
-      .from(transactions)
-      .where(and(gte(transactions.ts, monthStart), eq(transactions.type, 'expense')))
-      .groupBy(transactions.category)
-      .orderBy(sql`2 desc`),
-    db
-      .select({ total: sql<string>`coalesce(sum(${transactions.amount}), 0)` })
-      .from(transactions)
-      .where(and(gte(transactions.ts, monthStart), eq(transactions.type, 'expense'))),
-    db
-      .select()
-      .from(transactions)
-      .where(and(gte(transactions.ts, twoWeeksAgo), eq(transactions.type, 'expense')))
-      .limit(1000),
-  ]);
+  const [today, byCategory, monthIncome, recent, monthPace, allPositions, allRecurring] =
+    await Promise.all([
+      db.select().from(transactions).where(gte(transactions.ts, dayStart)).orderBy(desc(transactions.ts)).limit(50),
+      db
+        .select({ category: transactions.category, total: sql<string>`sum(${transactions.amount})` })
+        .from(transactions)
+        .where(and(gte(transactions.ts, monthStart), eq(transactions.type, 'expense')))
+        .groupBy(transactions.category)
+        .orderBy(sql`2 desc`),
+      db
+        .select({ total: sql<string>`coalesce(sum(${transactions.amount}), 0)` })
+        .from(transactions)
+        .where(and(gte(transactions.ts, monthStart), eq(transactions.type, 'income'))),
+      db
+        .select()
+        .from(transactions)
+        .where(and(gte(transactions.ts, twoWeeksAgo), eq(transactions.type, 'expense')))
+        .limit(1000),
+      db
+        .select({
+          total: sql<string>`coalesce(sum(${transactions.amount}), 0)`,
+          first: sql<string>`min(${transactions.ts})`,
+        })
+        .from(transactions)
+        .where(and(gte(transactions.ts, thirtyAgo), eq(transactions.type, 'expense'))),
+      db.select().from(positions).orderBy(desc(positions.value)),
+      db.select().from(recurring).orderBy(desc(recurring.amount)),
+    ]);
 
-  // Daily spend, last 14 days (IST days), oldest → newest.
+  // ---- month numbers ----
+  const monthSpend = byCategory.reduce((s, c) => s + Number(c.total), 0);
+  const incomeMonth = Number(monthIncome[0]?.total ?? 0);
+  const todaySpend = today.filter((t) => t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0);
+
+  // ---- donut slices: fixed color per category, rest folds ----
+  const colored = byCategory.filter((c) => CATEGORY_COLORS[c.category]);
+  const folded = byCategory.filter((c) => !CATEGORY_COLORS[c.category]);
+  const foldTotal = folded.reduce((s, c) => s + Number(c.total), 0);
+  const slices = [
+    ...colored.map((c) => ({ label: c.category, value: Number(c.total), color: CATEGORY_COLORS[c.category] })),
+    ...(foldTotal > 0 ? [{ label: 'everything else', value: foldTotal, color: FOLD_COLOR }] : []),
+  ];
+
+  // ---- net worth ----
+  const assets = allPositions.filter((p) => p.kind === 'asset') as Position[];
+  const liabilities = allPositions.filter((p) => p.kind === 'liability') as Position[];
+  const assetTotal = assets.reduce((s, p) => s + Number(p.value), 0);
+  const liabilityTotal = liabilities.reduce((s, p) => s + Number(p.value), 0);
+  const netWorth = assetTotal - liabilityTotal;
+  const maxPosition = Math.max(...allPositions.map((p) => Number(p.value)), 1);
+
+  // ---- recurring + forecast ----
+  const activeRec = allRecurring.filter((r) => r.active);
+  const recurringExp = activeRec.filter((r) => r.type === 'expense').reduce((s, r) => s + Number(r.amount), 0);
+  const recurringInc = activeRec.filter((r) => r.type === 'income').reduce((s, r) => s + Number(r.amount), 0);
+  // Variable pace: what I actually logged in the last 30 days, scaled to a month.
+  const paceDays = monthPace[0]?.first
+    ? Math.max(Math.min((Date.now() - new Date(monthPace[0].first).getTime()) / DAY, 30), 1)
+    : 0;
+  const variableMonthly = paceDays ? (Number(monthPace[0].total) / paceDays) * 30 : 0;
+  const forecast = recurringExp + variableMonthly;
+
+  // ---- daily spend, last 14 days (IST) ----
   const days: { key: string; label: string; total: number; isToday: boolean }[] = [];
   for (let i = 13; i >= 0; i--) {
     const d = new Date(dayStart.getTime() - i * DAY);
@@ -60,15 +134,11 @@ export default async function FinancePage() {
     if (bucket) bucket.total += Number(t.amount);
   }
   const maxDay = Math.max(...days.map((d) => d.total), 1);
-
-  const todaySpend = today
-    .filter((t) => t.type === 'expense')
-    .reduce((s, t) => s + Number(t.amount), 0);
-  const maxCat = Math.max(...byCategory.map((c) => Number(c.total)), 1);
+  const maxFlow = Math.max(incomeMonth, monthSpend, 1);
 
   return (
     <main className="space-y-10">
-      <section className="flex items-end justify-between">
+      <section className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="font-voice text-2xl italic">Finance</h1>
           <p className="mt-1 text-sm text-moth">Log it the moment it leaves your pocket.</p>
@@ -79,13 +149,165 @@ export default async function FinancePage() {
             <p className="text-xs text-moth">today</p>
           </div>
           <div>
-            <p className="font-mono text-lg text-linen">{fmtINR(Number(monthTotal[0]?.total ?? 0))}</p>
+            <p className="font-mono text-lg text-linen">{fmtINR(monthSpend)}</p>
             <p className="text-xs text-moth">this month</p>
+          </div>
+          <div>
+            <p className={`font-mono text-lg ${netWorth >= 0 ? 'text-sage' : 'text-rose'}`}>
+              {fmtINRShort(Math.abs(netWorth))}
+            </p>
+            <p className="text-xs text-moth">net worth</p>
           </div>
         </div>
       </section>
 
       <TxEntry />
+
+      <section className="grid gap-4 md:grid-cols-2">
+        <div className="rounded-xl border border-seam bg-veil/50 p-4">
+          <h2 className="mb-3 text-xs font-medium tracking-widest text-moth uppercase">
+            This month by category
+          </h2>
+          {slices.length === 0 ? (
+            <p className="text-sm text-moth">No expenses logged this month yet.</p>
+          ) : (
+            <div className="flex items-center gap-5">
+              <div className="relative">
+                <Donut slices={slices} total={monthSpend} />
+                <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="font-mono text-sm text-linen">{fmtINRShort(monthSpend)}</span>
+                  <span className="text-[10px] text-moth">spent</span>
+                </div>
+              </div>
+              <ul className="min-w-0 flex-1 space-y-1.5 text-xs">
+                {slices.map((s) => (
+                  <li key={s.label} className="flex items-center gap-2">
+                    <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: s.color }} aria-hidden />
+                    <span className="truncate text-moth">{s.label}</span>
+                    <span className="ml-auto font-mono text-linen/90">{fmtINRShort(s.value)}</span>
+                    <span className="w-9 text-right font-mono text-moth/60">
+                      {Math.round((s.value / monthSpend) * 100)}%
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-4">
+          <div className="rounded-xl border border-seam bg-veil/50 p-4">
+            <h2 className="mb-3 text-xs font-medium tracking-widest text-moth uppercase">
+              Money flow · this month
+            </h2>
+            <div className="space-y-2.5">
+              {[
+                { label: 'in', value: incomeMonth, color: 'bg-sage' },
+                { label: 'out', value: monthSpend, color: 'bg-ember' },
+              ].map((r) => (
+                <div key={r.label} className="flex items-center gap-3 text-sm">
+                  <span className="w-8 shrink-0 text-xs text-moth">{r.label}</span>
+                  <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-seam/60">
+                    <div
+                      className={`h-full rounded-r-full ${r.color}`}
+                      style={{ width: `${Math.max((r.value / maxFlow) * 100, 1.5)}%` }}
+                    />
+                  </div>
+                  <span className="w-20 shrink-0 text-right font-mono text-xs text-linen/90">
+                    {fmtINR(r.value)}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <p className="mt-3 text-xs text-moth">
+              net{' '}
+              <span className={`font-mono ${incomeMonth - monthSpend >= 0 ? 'text-sage' : 'text-rose'}`}>
+                {incomeMonth - monthSpend >= 0 ? '+' : '−'}
+                {fmtINR(Math.abs(incomeMonth - monthSpend))}
+              </span>
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-seam bg-veil/50 p-4">
+            <h2 className="mb-2 text-xs font-medium tracking-widest text-moth uppercase">
+              Next month, roughly
+            </h2>
+            <p className="font-mono text-xl text-linen">{fmtINR(Math.round(forecast))}</p>
+            <p className="mt-1 text-xs text-moth">
+              {fmtINR(recurringExp)} committed (recurring) + {fmtINR(Math.round(variableMonthly))} variable at
+              your current pace{recurringInc > 0 ? ` · ${fmtINR(recurringInc)}/mo recurring income` : ''}
+            </p>
+            <p className="mt-1.5 text-[10px] text-moth/60">
+              estimate from the last {Math.round(paceDays) || 0} day{Math.round(paceDays) === 1 ? '' : 's'} of
+              logged spends — gets sharper as you log
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <div className="mb-3 flex items-baseline justify-between">
+          <h2 className="text-xs font-medium tracking-widest text-moth uppercase">
+            Net worth
+            <span className={`ml-3 font-mono text-sm normal-case ${netWorth >= 0 ? 'text-sage' : 'text-rose'}`}>
+              {netWorth >= 0 ? '' : '−'}
+              {fmtINR(Math.abs(netWorth))}
+            </span>
+          </h2>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2">
+          {(
+            [
+              { kind: 'asset', label: 'Assets', items: assets, total: assetTotal },
+              { kind: 'liability', label: 'Liabilities', items: liabilities, total: liabilityTotal },
+            ] as const
+          ).map((col) => (
+            <div key={col.kind} className="space-y-2">
+              <div className="flex items-baseline justify-between">
+                <h3 className="text-xs text-moth">
+                  {col.label}
+                  <span className="ml-2 font-mono text-[11px] text-linen/80">{fmtINR(col.total)}</span>
+                </h3>
+                <AddPosition kind={col.kind} />
+              </div>
+              {col.items.length === 0 ? (
+                <p className="rounded-xl border border-seam bg-veil/30 px-4 py-3 text-xs text-moth/70">
+                  Nothing here yet — add {col.kind === 'asset' ? 'bank balances, investments…' : 'loans, dues…'}
+                </p>
+              ) : (
+                <ul className="divide-y divide-seam/60 rounded-xl border border-seam bg-veil/50">
+                  {col.items.map((p) => (
+                    <PositionRow key={p.id} item={p} max={maxPosition} />
+                  ))}
+                </ul>
+              )}
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section>
+        <div className="mb-3 flex items-baseline justify-between">
+          <h2 className="text-xs font-medium tracking-widest text-moth uppercase">
+            Recurring
+            <span className="ml-3 font-mono text-[11px] normal-case text-linen/80">
+              −{fmtINR(recurringExp)}/mo{recurringInc > 0 ? ` · +${fmtINR(recurringInc)}/mo` : ''}
+            </span>
+          </h2>
+          <AddRecurring />
+        </div>
+        {allRecurring.length === 0 ? (
+          <p className="rounded-xl border border-seam bg-veil/30 px-4 py-3 text-xs text-moth/70">
+            Rent, salary, subscriptions — add them once and the forecast uses them every month.
+          </p>
+        ) : (
+          <ul className="divide-y divide-seam/60 rounded-xl border border-seam bg-veil/50">
+            {allRecurring.map((r) => (
+              <RecurringRow key={r.id} item={r as Recurring} />
+            ))}
+          </ul>
+        )}
+      </section>
 
       <section>
         <h2 className="mb-3 text-xs font-medium tracking-widest text-moth uppercase">
@@ -112,33 +334,6 @@ export default async function FinancePage() {
           </div>
         </div>
       </section>
-
-      {byCategory.length > 0 && (
-        <section>
-          <h2 className="mb-3 text-xs font-medium tracking-widest text-moth uppercase">
-            This month by category
-          </h2>
-          <ul className="space-y-2.5 rounded-xl border border-seam bg-veil/50 p-4">
-            {byCategory.map((c) => {
-              const v = Number(c.total);
-              return (
-                <li key={c.category} className="flex items-center gap-3 text-sm">
-                  <span className="w-24 shrink-0 text-moth">{c.category}</span>
-                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-seam/60">
-                    <div
-                      className="h-full rounded-r-full bg-ember"
-                      style={{ width: `${Math.max((v / maxCat) * 100, 2)}%` }}
-                    />
-                  </div>
-                  <span className="w-20 shrink-0 text-right font-mono text-xs text-linen/90">
-                    {fmtINR(v)}
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      )}
 
       <section>
         <h2 className="mb-3 text-xs font-medium tracking-widest text-moth uppercase">Today</h2>

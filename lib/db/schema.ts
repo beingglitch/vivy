@@ -107,6 +107,34 @@ export const transactions = pgTable(
   (t) => [index('transactions_ts_idx').on(t.ts)],
 );
 
+// Net-worth line items — what I own and owe, current value edited in place.
+// Manual for now (same interim fallback as manual transactions); bank/broker
+// ingestors will update the same rows later.
+export const positions = pgTable('positions', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  kind: text('kind').notNull(), // 'asset' | 'liability'
+  name: text('name').notNull(),
+  category: text('category').notNull().default('other'), // 'cash' | 'bank' | 'investment' | 'property' | 'loan' | 'credit' | 'other'
+  value: numeric('value', { precision: 14, scale: 2 }).notNull(), // INR
+  note: text('note'),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Recurring money rules (rent, salary, subscriptions). The forecast reads these;
+// actual payments still land in `transactions` when they happen.
+export const recurring = pgTable('recurring', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  name: text('name').notNull(),
+  amount: numeric('amount', { precision: 12, scale: 2 }).notNull(), // INR per month
+  type: text('type').notNull().default('expense'), // 'expense' | 'income'
+  category: text('category').notNull().default('bills'),
+  dayOfMonth: integer('day_of_month'), // when it usually hits (1–31), optional
+  active: boolean('active').notNull().default(true),
+  note: text('note'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const chatMessages = pgTable('chat_messages', {
   id: uuid('id').defaultRandom().primaryKey(),
   role: text('role').notNull(), // 'user' | 'assistant'
