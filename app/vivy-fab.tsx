@@ -253,7 +253,7 @@ export function VivyFab() {
   return (
     <>
       {open && (
-        <div className="fixed right-4 bottom-20 z-50 flex max-h-[70vh] w-[min(24rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-seam bg-night/95 shadow-2xl shadow-black/50 backdrop-blur">
+        <div className="fixed right-4 bottom-[8.75rem] z-50 flex max-h-[65vh] w-[min(24rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-seam bg-night/95 shadow-2xl shadow-black/50 backdrop-blur sm:bottom-20 sm:max-h-[70vh]">
           <div className="flex items-center gap-2 border-b border-seam/70 px-4 py-2.5">
             <span className="presence h-2 w-2 rounded-full bg-ember" aria-hidden />
             <span className="font-voice text-sm italic text-linen">Vivy</span>
@@ -397,7 +397,7 @@ export function VivyFab() {
         onClick={() => setOpen((v) => !v)}
         title="Talk to Vivy"
         aria-expanded={open}
-        className={`fixed right-4 bottom-4 z-50 flex h-13 w-13 items-center justify-center rounded-full border shadow-lg shadow-black/40 transition-all ${
+        className={`fixed right-4 bottom-[4.75rem] z-50 flex h-13 w-13 items-center justify-center rounded-full border shadow-lg shadow-black/40 transition-all sm:bottom-4 ${
           open
             ? 'border-ember bg-ember text-night'
             : 'presence border-seam bg-veil text-ember hover:border-ember/60'

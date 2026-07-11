@@ -148,6 +148,13 @@ export const recurring = pgTable('recurring', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+// Small key-value store for user profile/settings (name, date of birth, …).
+export const settings = pgTable('settings', {
+  key: text('key').primaryKey(),
+  value: text('value').notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 // Interest areas for paper suggestions. Weight is the interest score the
 // feedback loop adjusts — reading bumps it, skipping decays it. Over months the
 // weights ARE the answer to "what am I actually into".

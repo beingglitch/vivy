@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 import { Fraunces, Instrument_Sans, Geist_Mono } from "next/font/google";
 import { VivyFab } from "./vivy-fab";
+import { MobileTabs } from "./mobile-tabs";
 import "./globals.css";
 
 // Her voice — a soft, warm serif. UI stays in a quiet sans; numbers in mono.
@@ -51,14 +52,14 @@ export default function RootLayout({
     >
       <body className="flex min-h-full flex-col font-sans">
         <header className="border-b border-seam/70">
-          {/* overflow-x-auto keeps the nav itself scrollable on narrow phones instead
-              of widening the page and giving everything a horizontal scrollbar. */}
-          <nav className="mx-auto flex max-w-4xl items-center gap-5 overflow-x-auto px-4 py-3 text-sm whitespace-nowrap sm:gap-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {/* Phones navigate with the bottom tab bar; the top row keeps just the
+              wordmark and settings. Full link row appears from sm up. */}
+          <nav className="mx-auto flex max-w-4xl items-center gap-5 px-4 py-3 text-sm sm:gap-6">
             <Link href="/" className="flex items-center gap-2">
               <span className="presence h-2 w-2 rounded-full bg-ember" aria-hidden />
               <span className="font-voice text-lg italic tracking-wide text-linen">Vivy</span>
             </Link>
-            <div className="flex gap-5 pt-0.5">
+            <div className="hidden gap-5 pt-0.5 sm:flex">
               {nav.map((n) => (
                 <Link
                   key={n.href}
@@ -69,10 +70,21 @@ export default function RootLayout({
                 </Link>
               ))}
             </div>
+            <Link
+              href="/settings"
+              title="Settings"
+              className="ml-auto text-moth transition-colors hover:text-linen"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" className="h-4.5 w-4.5" aria-hidden>
+                <circle cx="12" cy="12" r="3" />
+                <path d="M12 3.5v2m0 13v2m8.5-8.5h-2m-13 0h-2m14.6-6.1-1.4 1.4M6.3 17.7l-1.4 1.4m14.2 0-1.4-1.4M6.3 6.3 4.9 4.9" strokeLinecap="round" />
+              </svg>
+            </Link>
           </nav>
         </header>
-        <div className="mx-auto w-full max-w-4xl flex-1 px-4 py-8 pb-24">{children}</div>
+        <div className="mx-auto w-full max-w-4xl flex-1 px-4 py-8 pb-36 sm:pb-24">{children}</div>
         <VivyFab />
+        <MobileTabs />
       </body>
     </html>
   );

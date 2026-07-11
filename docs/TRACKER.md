@@ -39,6 +39,8 @@ Next.js + TypeScript app, Neon Postgres, Drizzle, deployed on Vercel from day on
 - [x] [x] Chart-first dashboard (stat tiles, collapsed brief, 2×2 14-day trend grid, domains + learning progress) — screenshot-verified 2026-07-11
 - [x] [x] Home net-worth hero (full-width, links to /finance) + daily/monthly on every stat tile — 390px screenshot-verified 2026-07-11
 - [x] [x] Mobile fit: nav self-scrolls (was widening the page), donut legend stacks, position bars wrap — 390px screenshot-verified 2026-07-11
+- [x] [x] Personalization: settings table + /settings page (name, DOB), greeting uses name, age (2 decimals) beside home net worth, name memory for chat/brief — screenshot-verified 2026-07-12
+- [x] [x] Mobile bottom tab bar (Home/Tasks/Learn/Money/Browse, active state; chat = FAB); top bar reduced to wordmark + settings — screenshot-verified 2026-07-12
 
 ### Event API — the one pipe [[SPEC-0001]]
 Every ingestor (browser, screen agent, finance, recorder) POSTs to this. The timeline table.

@@ -3,6 +3,7 @@ import { and, desc, eq, gte, sql } from 'drizzle-orm';
 import { db, briefs, events, learning, positions, tasks, transactions } from '@/lib/db';
 import { browsingStats, fmtDuration } from '@/lib/browsing';
 import { fmtINR, fmtINRShort } from '@/lib/finance';
+import { ageYears, getProfile } from '@/lib/settings';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,14 +13,15 @@ function istDayKey(d: Date): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(d);
 }
 
-function greeting(): string {
+function greeting(name?: string): string {
   const h = Number(
     new Intl.DateTimeFormat('en-IN', { hour: 'numeric', hour12: false, timeZone: 'Asia/Kolkata' }).format(new Date()),
   );
-  if (h < 5) return 'Still up?';
-  if (h < 12) return 'Good morning.';
-  if (h < 17) return 'Good afternoon.';
-  return 'Good evening.';
+  const who = name ? `, ${name}` : '';
+  if (h < 5) return `Still up${who}?`;
+  if (h < 12) return `Good morning${who}.`;
+  if (h < 17) return `Good afternoon${who}.`;
+  return `Good evening${who}.`;
 }
 
 type DayBucket = { key: string; label: string; value: number; isToday: boolean };
@@ -116,6 +118,7 @@ export default async function Dashboard() {
     latestBrief,
     todayStats,
     allPositions,
+    profile,
     monthAgg,
   ] = await Promise.all([
       db
@@ -148,6 +151,7 @@ export default async function Dashboard() {
       db.select().from(briefs).orderBy(desc(briefs.day)).limit(1),
       browsingStats(dayStart),
       db.select().from(positions),
+      getProfile(),
       // month-to-date rollups for the daily/monthly stat tiles, in one round trip
       db
         .select({
@@ -223,10 +227,13 @@ export default async function Dashboard() {
     { label: 'spent today', value: fmtINR(spendToday), month: `${fmtINR(monthSpend)} this month` },
   ];
 
+  const firstName = profile.name.split(' ')[0];
+  const age = ageYears(profile.dob);
+
   return (
     <main className="space-y-8">
       <section>
-        <p className="font-voice text-2xl italic text-linen">{greeting()}</p>
+        <p className="font-voice text-2xl italic text-linen">{greeting(firstName || undefined)}</p>
         <h1 className="mt-1 text-sm text-moth">
           {new Date().toLocaleDateString('en-IN', {
             weekday: 'long',
@@ -251,7 +258,14 @@ export default async function Dashboard() {
         </p>
         <p className="mt-2 text-xs text-moth">
           own <span className="font-mono text-sage">{fmtINRShort(ownTotal)}</span> · owe{' '}
-          <span className="font-mono text-rose">{fmtINRShort(oweTotal)}</span> · the goal is up →
+          <span className="font-mono text-rose">{fmtINRShort(oweTotal)}</span>
+          {age !== null && (
+            <>
+              {' '}
+              · age <span className="font-mono text-linen/90">{age.toFixed(2)}</span>
+            </>
+          )}{' '}
+          · the goal is up →
         </p>
       </Link>
 
