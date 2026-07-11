@@ -244,28 +244,37 @@ export default async function Dashboard() {
         </h1>
       </section>
 
-      {/* The mission number. Everything else on this page is in service of moving it up. */}
+      {/* The mission numbers, side by side: what you have, and how much of the
+          clock is already spent. The pairing IS the message. */}
       <Link
         href="/finance"
         className="block rounded-xl border border-seam bg-veil/50 px-4 py-6 text-center transition-colors hover:border-ember/40"
       >
-        <p className="text-xs font-medium tracking-widest text-moth uppercase">Net worth</p>
-        <p
-          className={`mt-1.5 font-mono text-4xl tracking-tight sm:text-5xl ${netWorth >= 0 ? 'text-sage' : 'text-rose'}`}
-        >
-          {netWorth < 0 ? '−' : ''}
-          {fmtINR(Math.abs(netWorth))}
-        </p>
-        <p className="mt-2 text-xs text-moth">
-          own <span className="font-mono text-sage">{fmtINRShort(ownTotal)}</span> · owe{' '}
-          <span className="font-mono text-rose">{fmtINRShort(oweTotal)}</span>
+        <div className="flex items-end justify-center gap-5 sm:gap-8">
+          <div>
+            <p className="text-xs font-medium tracking-widest text-moth uppercase">Net worth</p>
+            <p
+              className={`mt-1.5 font-mono text-3xl tracking-tight sm:text-5xl ${netWorth >= 0 ? 'text-sage' : 'text-rose'}`}
+            >
+              {netWorth < 0 ? '−' : ''}
+              {fmtINR(Math.abs(netWorth))}
+            </p>
+          </div>
           {age !== null && (
             <>
-              {' '}
-              · age <span className="font-mono text-linen/90">{age.toFixed(2)}</span>
+              <div className="h-12 w-px bg-seam sm:h-14" aria-hidden />
+              <div>
+                <p className="text-xs font-medium tracking-widest text-moth uppercase">Age</p>
+                <p className="mt-1.5 font-mono text-3xl tracking-tight text-linen sm:text-5xl">
+                  {age.toFixed(2)}
+                </p>
+              </div>
             </>
-          )}{' '}
-          · the goal is up →
+          )}
+        </div>
+        <p className="mt-3 text-xs text-moth">
+          own <span className="font-mono text-sage">{fmtINRShort(ownTotal)}</span> · owe{' '}
+          <span className="font-mono text-rose">{fmtINRShort(oweTotal)}</span> · the goal is up →
         </p>
       </Link>
 

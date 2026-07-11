@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, gte, sql } from 'drizzle-orm';
 import { db, networthSnapshots, positions, recurring, transactions } from '@/lib/db';
 import { CATEGORY_COLORS, FOLD_COLOR, fmtINR, fmtINRShort } from '@/lib/finance';
+import { ageYears, getProfile } from '@/lib/settings';
 import { TxEntry, TxDelete } from './tx-entry';
 import { PositionRow, AddPosition, RecurringRow, AddRecurring } from './manage';
 import type { Position, Recurring } from './manage';
@@ -115,7 +116,7 @@ export default async function FinancePage() {
   const twoWeeksAgo = new Date(dayStart.getTime() - 13 * DAY);
   const thirtyAgo = new Date(dayStart.getTime() - 30 * DAY);
 
-  const [today, byCategory, monthIncome, recent, monthPace, allPositions, allRecurring, snapshots] =
+  const [today, byCategory, monthIncome, recent, monthPace, allPositions, allRecurring, snapshots, profile] =
     await Promise.all([
       db.select().from(transactions).where(gte(transactions.ts, dayStart)).orderBy(desc(transactions.ts)).limit(50),
       db
@@ -143,6 +144,7 @@ export default async function FinancePage() {
       db.select().from(positions).orderBy(desc(positions.value)),
       db.select().from(recurring).orderBy(desc(recurring.amount)),
       db.select().from(networthSnapshots).orderBy(asc(networthSnapshots.day)).limit(365),
+      getProfile(),
     ]);
 
   // ---- month numbers ----
@@ -221,15 +223,30 @@ export default async function FinancePage() {
         </div>
       </section>
 
-      {/* The number that matters most, front and center. */}
+      {/* The numbers that matter most, side by side: money and the clock. */}
       <section className="rounded-xl border border-seam bg-veil/50 px-4 pt-8 pb-4 text-center">
-        <p className="text-xs font-medium tracking-widest text-moth uppercase">Net worth</p>
-        <p
-          className={`mt-2 font-mono text-5xl tracking-tight sm:text-6xl ${netWorth >= 0 ? 'text-sage' : 'text-rose'}`}
-        >
-          {netWorth < 0 ? '−' : ''}
-          {fmtINR(Math.abs(netWorth))}
-        </p>
+        <div className="flex items-end justify-center gap-5 sm:gap-10">
+          <div>
+            <p className="text-xs font-medium tracking-widest text-moth uppercase">Net worth</p>
+            <p
+              className={`mt-2 font-mono text-3xl tracking-tight sm:text-6xl ${netWorth >= 0 ? 'text-sage' : 'text-rose'}`}
+            >
+              {netWorth < 0 ? '−' : ''}
+              {fmtINR(Math.abs(netWorth))}
+            </p>
+          </div>
+          {ageYears(profile.dob) !== null && (
+            <>
+              <div className="h-12 w-px bg-seam sm:h-16" aria-hidden />
+              <div>
+                <p className="text-xs font-medium tracking-widest text-moth uppercase">Age</p>
+                <p className="mt-2 font-mono text-3xl tracking-tight text-linen sm:text-6xl">
+                  {ageYears(profile.dob)!.toFixed(2)}
+                </p>
+              </div>
+            </>
+          )}
+        </div>
         <p className="mt-3 text-xs text-moth">
           own <span className="font-mono text-sage">{fmtINR(assetTotal)}</span> · owe{' '}
           <span className="font-mono text-rose">{fmtINR(liabilityTotal)}</span>
