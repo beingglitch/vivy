@@ -161,6 +161,11 @@ One `learning` concept (kind: book|course), unit-based progress, coached in the 
 
 ## Epic 5 — Proactive Vivy (she initiates)
 
+### Self-improvement loop [[SPEC-0006]]
+- [x] [x] `noteFeedback` chat tool → feedback events + docs/FEEDBACK.md fallback queue — built 2026-07-11
+- [x] [ ] Nightly cloud routine "Vivy night engineer" (Opus, 3:00 AM IST): one small frontend/backend improvement → PR, never main — created 2026-07-11; first-night PR pending
+- [ ] [ ] Auto-merge trivial PR classes (copy/docs) once PR quality is proven
+
 ### Nudges & reviews
 - [ ] [ ] Weekly review generated Sunday evening (wins, slips, next week's focus)
 - [ ] [ ] Real-time nudges via push channel (screen time, deadlines, dues)

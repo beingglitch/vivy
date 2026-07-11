@@ -204,6 +204,27 @@ const vivyTools = {
     },
   }),
 
+  noteFeedback: tool({
+    description:
+      'Save feedback about Vivy herself — a complaint, idea, or feature request about this app ' +
+      '("the donut chart is confusing", "add dark red for debts"). A night-shift engineer agent ' +
+      'reads these and improves the app, so capture it whenever I critique or wish for something.',
+    inputSchema: z.object({
+      summary: z.string().describe('short title of the feedback'),
+      detail: z.string().nullable().describe('full context in my words'),
+    }),
+    execute: async ({ summary, detail }) => {
+      await db.insert(events).values({
+        source: 'chat',
+        type: 'feedback',
+        title: summary,
+        payload: { detail },
+        processed: false, // the night engineer flips this understanding as handled
+      });
+      return { saved: summary, note: 'the night engineer will pick it up' };
+    },
+  }),
+
   remember: tool({
     description:
       'Store a lasting fact about me (preference, person, goal, constraint). Use when I tell you something worth keeping.',
