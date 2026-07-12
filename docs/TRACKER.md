@@ -119,9 +119,8 @@ One `learning` concept (kind: book|course), unit-based progress, coached in the 
 - [x] [x] AI video classification (education/entertainment/music/…, Haiku batch, cron every 4h) + "video time by type" band on /browsing + brief context — verified 2026-07-11: Friends→entertainment, Coinbase breakdown→tech, Akon→music
 
 ### Screen-time agent
-- [ ] [ ] Linux agent (active window + app time sampler) → events, auto-starts on boot
 - [ ] [ ] Daily screen-time rollup + AI suggestions ("3h YouTube — cap it tomorrow?")
-- [ ] [ ] Android usage-stats companion app → events (automatic, no manual logging)
+- *(the OS-level collectors — desktop agent + Android usage-stats app — moved to Epic 6, which owns the native shells they ship inside)*
 
 ### Life-account ingestors (email & calendar)
 - [ ] [ ] Google Calendar sync: meetings/events flow into the timeline + daily brief
@@ -181,5 +180,39 @@ One `learning` concept (kind: book|course), unit-based progress, coached in the 
 ### Deeper memory
 - [ ] [ ] Long-term memory store with retrieval (facts, preferences, people, decisions)
 - [ ] [ ] "Ask Vivy anything about my life" over the full timeline (search + RAG)
+
+**Bugs:** *(none open)*
+
+---
+
+## Epic 6 — Native Surfaces & Release Pipeline (desktop + Android apps, CI/CD)
+
+**Deferred by design (2026-07-13): start only after the task flow is finalized** — SPEC-0007
+clicked through in a real browser and lived-with for a few days. Everything stays a thin
+client over the same Event API + one database (architecture rule); the apps exist to (a)
+track activity at OS level, not just in the browser, and (b) carry Vivy everywhere.
+Needs a spec before building (stack choice desktop shell / Android approach = ADRs).
+
+### Desktop-fit web UI
+The UI was built mobile-first; desktop currently gets a stretched phone layout.
+- [ ] [ ] Desktop audit: widen content, multi-column dashboard (tiles + brief side by side), tasks/finance two-pane
+- [ ] [ ] Keyboard-first quick capture (global "add task/expense" command palette)
+
+### Desktop app (shell + OS-level tracker)
+- [ ] [ ] Pick shell (Tauri vs Electron) — record as ADR; wrap the web app + system tray
+- [ ] [ ] OS-level activity tracker: active window/app + idle detection → batched events (source 'desktop-agent') — moved from Epic 2
+- [ ] [ ] Auto-start on boot, offline queue with retry (Event API already takes batches)
+
+### Android app
+- [ ] [ ] Pick approach (native Kotlin vs Capacitor wrapper + native module) — record as ADR
+- [ ] [ ] UsageStats permission → daily per-app screen-time events (automatic, no manual logging) — moved from Epic 2
+- [ ] [ ] Push notifications: daily brief + nudges land on the phone
+- [ ] [ ] (later, ties into Epic 3) SMS listener → bank-transaction events
+
+### CI/CD & releases
+- [ ] [ ] GitHub Actions: push a `v*` tag → build desktop binaries + Android APK → attach to a GitHub Release
+- [ ] [ ] In-app update notification: apps check the latest release version and nudge to update
+- [ ] [ ] App version surfaced in /settings; release notes generated from commits since last tag
+- [ ] [ ] (web already ships via Vercel on every push — unchanged)
 
 **Bugs:** *(none open)*
