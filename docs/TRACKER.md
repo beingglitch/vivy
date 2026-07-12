@@ -54,7 +54,7 @@ Every ingestor (browser, screen agent, finance, recorder) POSTs to this. The tim
 Tasks are the first-class citizen: created manually, by chat, or extracted from any event.
 
 - [x] [x] `tasks` table: title, detail, status, priority, due, project, source-event link
-- [x] [ ] Task CRUD (API + UI): API curl-verified; UI renders but not yet clicked through in a browser
+- [x] [ ] Task CRUD (API + UI): API curl-verified; UI renders but not yet clicked through in a browser. Add-task form now fails safe — keeps your text + shows a warm error if the save doesn't land, and never locks the Add button (2026-07-12)
 - [ ] [ ] Projects/areas (startup, job, personal, finance) — table exists, no UI/grouping yet
 - [x] [x] AI task extraction: any ingested text event can yield proposed tasks (approve/reject UI on /tasks) — verified 2026-07-08: note → 2 correct tasks with due dates; UI approve flow not yet clicked
 
