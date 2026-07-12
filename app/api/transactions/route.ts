@@ -29,6 +29,7 @@ export async function POST(req: NextRequest) {
       note: body.note ?? null,
       ts: body.ts ? new Date(body.ts) : new Date(),
       source: body.source ?? 'manual',
+      recurringId: typeof body.recurringId === 'string' ? body.recurringId : null,
     })
     .returning();
   return NextResponse.json({ transaction: row });

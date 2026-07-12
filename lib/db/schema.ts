@@ -102,6 +102,9 @@ export const transactions = pgTable(
     category: text('category').notNull().default('other'),
     note: text('note'),
     source: text('source').notNull().default('manual'), // 'manual' | 'chat' | 'sms' | 'gmail' | 'bank'
+    // Set when this payment settles a recurring bill — keeps bills and daily
+    // spends separable in every month view.
+    recurringId: uuid('recurring_id').references(() => recurring.id),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index('transactions_ts_idx').on(t.ts)],

@@ -1,9 +1,10 @@
 import Link from 'next/link';
-import { and, desc, eq, gte, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, isNull, sql } from 'drizzle-orm';
 import { db, briefs, events, learning, positions, tasks, transactions } from '@/lib/db';
 import { browsingStats, fmtDuration } from '@/lib/browsing';
 import { fmtINR, fmtINRShort } from '@/lib/finance';
-import { ageYears, getProfile } from '@/lib/settings';
+import { getProfile } from '@/lib/settings';
+import { AgeDisplay } from '@/app/age-display';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,7 +16,11 @@ function istDayKey(d: Date): string {
 
 function greeting(name?: string): string {
   const h = Number(
-    new Intl.DateTimeFormat('en-IN', { hour: 'numeric', hour12: false, timeZone: 'Asia/Kolkata' }).format(new Date()),
+    new Intl.DateTimeFormat('en-IN', {
+      hour: 'numeric',
+      hour12: false,
+      timeZone: 'Asia/Kolkata',
+    }).format(new Date()),
   );
   const who = name ? `, ${name}` : '';
   if (h < 5) return `Still up${who}?`;
@@ -24,7 +29,12 @@ function greeting(name?: string): string {
   return `Good evening${who}.`;
 }
 
-type DayBucket = { key: string; label: string; value: number; isToday: boolean };
+type DayBucket = {
+  key: string;
+  label: string;
+  value: number;
+  isToday: boolean;
+};
 
 function makeDays(n: number): DayBucket[] {
   const dayStart = new Date();
@@ -34,7 +44,10 @@ function makeDays(n: number): DayBucket[] {
     const d = new Date(dayStart.getTime() - i * DAY);
     days.push({
       key: istDayKey(d),
-      label: new Intl.DateTimeFormat('en-IN', { weekday: 'narrow', timeZone: 'Asia/Kolkata' }).format(d),
+      label: new Intl.DateTimeFormat('en-IN', {
+        weekday: 'narrow',
+        timeZone: 'Asia/Kolkata',
+      }).format(d),
       value: 0,
       isToday: i === 0,
     });
@@ -64,7 +77,9 @@ function Bars({
           </span>
           <div
             className={`w-full rounded-t ${d.isToday ? bar : `${dim} group-hover:${bar}`}`}
-            style={{ height: `${d.value === 0 ? 2 : Math.max((d.value / max) * 100, 5)}%` }}
+            style={{
+              height: `${d.value === 0 ? 2 : Math.max((d.value / max) * 100, 5)}%`,
+            }}
           />
           <span
             className={`mt-1 text-center font-mono text-[8px] ${d.isToday ? (color === 'ember' ? 'text-ember' : 'text-sage') : 'text-moth/60'}`}
@@ -121,50 +136,61 @@ export default async function Dashboard() {
     profile,
     monthAgg,
   ] = await Promise.all([
-      db
-        .select({ ts: events.ts, type: events.type, payload: events.payload })
-        .from(events)
-        .where(and(eq(events.source, 'browser'), gte(events.ts, twoWeeksAgo)))
-        .limit(5000),
-      db
-        .select({ completedAt: tasks.completedAt })
-        .from(tasks)
-        .where(and(eq(tasks.status, 'done'), gte(tasks.completedAt, twoWeeksAgo))),
-      db
-        .select({ ts: events.ts, payload: events.payload })
-        .from(events)
-        .where(and(eq(events.type, 'learning.log'), gte(events.ts, twoWeeksAgo))),
-      db
-        .select({ ts: transactions.ts, amount: transactions.amount })
-        .from(transactions)
-        .where(and(gte(transactions.ts, twoWeeksAgo), eq(transactions.type, 'expense'))),
-      db
-        .select({ n: sql<number>`count(*)::int` })
-        .from(tasks)
-        .where(sql`${tasks.status} in ('inbox','today','doing')`),
-      db
-        .select()
-        .from(learning)
-        .where(eq(learning.status, 'active'))
-        .orderBy(desc(learning.createdAt))
-        .limit(6),
-      db.select().from(briefs).orderBy(desc(briefs.day)).limit(1),
-      browsingStats(dayStart),
-      db.select().from(positions),
-      getProfile(),
-      // month-to-date rollups for the daily/monthly stat tiles, in one round trip
-      db
-        .select({
-          screenSec: sql<string>`coalesce(sum((${events.payload}->>'seconds')::numeric) filter (where ${events.source} = 'browser' and ${events.ts} >= ${monthStart}), 0)`,
-          units: sql<string>`coalesce(sum((${events.payload}->>'units')::numeric) filter (where ${events.type} = 'learning.log' and ${events.ts} >= ${monthStart}), 0)`,
-        })
-        .from(events)
-        .where(gte(events.ts, monthStart)),
-      ]);
+    db
+      .select({ ts: events.ts, type: events.type, payload: events.payload })
+      .from(events)
+      .where(and(eq(events.source, 'browser'), gte(events.ts, twoWeeksAgo)))
+      .limit(5000),
+    db
+      .select({ completedAt: tasks.completedAt })
+      .from(tasks)
+      .where(and(eq(tasks.status, 'done'), gte(tasks.completedAt, twoWeeksAgo))),
+    db
+      .select({ ts: events.ts, payload: events.payload })
+      .from(events)
+      .where(and(eq(events.type, 'learning.log'), gte(events.ts, twoWeeksAgo))),
+    // day-to-day spending only — bill payments (linked to a recurring rule)
+    // would drown these small bars
+    db
+      .select({ ts: transactions.ts, amount: transactions.amount })
+      .from(transactions)
+      .where(
+        and(
+          gte(transactions.ts, twoWeeksAgo),
+          eq(transactions.type, 'expense'),
+          isNull(transactions.recurringId),
+        ),
+      ),
+    db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(tasks)
+      .where(sql`${tasks.status} in ('inbox','today','doing')`),
+    db
+      .select()
+      .from(learning)
+      .where(eq(learning.status, 'active'))
+      .orderBy(desc(learning.createdAt))
+      .limit(6),
+    db.select().from(briefs).orderBy(desc(briefs.day)).limit(1),
+    browsingStats(dayStart),
+    db.select().from(positions),
+    getProfile(),
+    // month-to-date rollups for the daily/monthly stat tiles, in one round trip
+    db
+      .select({
+        screenSec: sql<string>`coalesce(sum((${events.payload}->>'seconds')::numeric) filter (where ${events.source} = 'browser' and ${events.ts} >= ${monthStart}), 0)`,
+        units: sql<string>`coalesce(sum((${events.payload}->>'units')::numeric) filter (where ${events.type} = 'learning.log' and ${events.ts} >= ${monthStart}), 0)`,
+      })
+      .from(events)
+      .where(gte(events.ts, monthStart)),
+  ]);
 
   const [monthSpendRow, monthDoneRow] = await Promise.all([
     db
-      .select({ total: sql<string>`coalesce(sum(${transactions.amount}), 0)` })
+      .select({
+        daily: sql<string>`coalesce(sum(${transactions.amount}) filter (where ${transactions.recurringId} is null), 0)`,
+        bills: sql<string>`coalesce(sum(${transactions.amount}) filter (where ${transactions.recurringId} is not null), 0)`,
+      })
       .from(transactions)
       .where(and(gte(transactions.ts, monthStart), eq(transactions.type, 'expense'))),
     db
@@ -215,20 +241,36 @@ export default async function Dashboard() {
 
   const monthScreen = Number(monthAgg[0]?.screenSec ?? 0);
   const monthUnits = Number(monthAgg[0]?.units ?? 0);
-  const monthSpend = Number(monthSpendRow[0]?.total ?? 0);
+  const monthDaily = Number(monthSpendRow[0]?.daily ?? 0);
+  const monthBills = Number(monthSpendRow[0]?.bills ?? 0);
   const monthDone = monthDoneRow[0]?.n ?? 0;
   const unitsToday = readDays[readDays.length - 1].value;
 
   // Each tile: today's number big, this month's beneath it.
   const tiles = [
-    { label: 'screen today', value: fmtDuration(screenDays[13].value), month: `${fmtDuration(monthScreen)} this month` },
-    { label: 'open tasks', value: String(openCount[0]?.n ?? 0), month: `${monthDone} done this month` },
-    { label: 'chapters today', value: String(unitsToday), month: `${monthUnits} this month` },
-    { label: 'spent today', value: fmtINR(spendToday), month: `${fmtINR(monthSpend)} this month` },
+    {
+      label: 'screen today',
+      value: fmtDuration(screenDays[13].value),
+      month: `${fmtDuration(monthScreen)} this month`,
+    },
+    {
+      label: 'open tasks',
+      value: String(openCount[0]?.n ?? 0),
+      month: `${monthDone} done this month`,
+    },
+    {
+      label: 'chapters today',
+      value: String(unitsToday),
+      month: `${monthUnits} this month`,
+    },
+    {
+      label: 'spent today',
+      value: fmtINR(spendToday),
+      month: `${fmtINR(monthDaily)} daily · ${fmtINR(monthBills)} bills this month`,
+    },
   ];
 
   const firstName = profile.name.split(' ')[0];
-  const age = ageYears(profile.dob);
 
   return (
     <main className="space-y-8">
@@ -260,15 +302,13 @@ export default async function Dashboard() {
               {fmtINR(Math.abs(netWorth))}
             </p>
           </div>
-          {age !== null && (
+          {profile.dob && (
             <>
               <div className="h-12 w-px bg-seam sm:h-14" aria-hidden />
-              <div>
-                <p className="text-xs font-medium tracking-widest text-moth uppercase">Age</p>
-                <p className="mt-1.5 font-mono text-3xl tracking-tight text-linen sm:text-5xl">
-                  {age.toFixed(2)}
-                </p>
-              </div>
+              <AgeDisplay
+                dob={profile.dob}
+                numberClass="mt-1.5 font-mono text-3xl tracking-tight text-linen sm:text-5xl"
+              />
             </>
           )}
         </div>
@@ -328,7 +368,9 @@ export default async function Dashboard() {
                   <div className="h-2 flex-1 overflow-hidden rounded-full bg-seam/60">
                     <div
                       className="h-full rounded-r-full bg-ember/80"
-                      style={{ width: `${Math.max((d.seconds / maxDomain) * 100, 2)}%` }}
+                      style={{
+                        width: `${Math.max((d.seconds / maxDomain) * 100, 2)}%`,
+                      }}
                     />
                   </div>
                   <span className="w-14 shrink-0 text-right font-mono text-xs text-linen/90">
@@ -354,7 +396,9 @@ export default async function Dashboard() {
                     <div className="h-2 flex-1 overflow-hidden rounded-full bg-seam/60">
                       <div
                         className="h-full rounded-r-full bg-sage"
-                        style={{ width: `${pct === null ? 2 : Math.max(pct, 2)}%` }}
+                        style={{
+                          width: `${pct === null ? 2 : Math.max(pct, 2)}%`,
+                        }}
                       />
                     </div>
                     <span className="w-14 shrink-0 text-right font-mono text-xs text-linen/90">

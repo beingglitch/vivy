@@ -1,7 +1,8 @@
-import { and, asc, desc, eq, gte, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, isNotNull, isNull, sql } from 'drizzle-orm';
 import { db, networthSnapshots, positions, recurring, transactions } from '@/lib/db';
 import { CATEGORY_COLORS, FOLD_COLOR, fmtINR, fmtINRShort } from '@/lib/finance';
-import { ageYears, getProfile } from '@/lib/settings';
+import { getProfile } from '@/lib/settings';
+import { AgeDisplay } from '@/app/age-display';
 import { TxEntry, TxDelete } from './tx-entry';
 import { PositionRow, AddPosition, RecurringRow, AddRecurring } from './manage';
 import type { Position, Recurring } from './manage';
@@ -16,12 +17,23 @@ function dayKeyIST(d: Date): string {
 
 // Donut of this month's spend. Categories with a fixed color get a segment;
 // the rest fold into "everything else" (they still show in the list below).
-function Donut({ slices, total }: { slices: { label: string; value: number; color: string }[]; total: number }) {
+function Donut({
+  slices,
+  total,
+}: {
+  slices: { label: string; value: number; color: string }[];
+  total: number;
+}) {
   const R = 15.9155; // circumference = 100, so lengths are percentages
   let start = 0;
   const gap = slices.length > 1 ? 1 : 0;
   return (
-    <svg viewBox="0 0 42 42" role="img" aria-label="Spend by category" className="h-44 w-44 shrink-0 -rotate-90">
+    <svg
+      viewBox="0 0 42 42"
+      role="img"
+      aria-label="Spend by category"
+      className="h-44 w-44 shrink-0 -rotate-90"
+    >
       <circle cx="21" cy="21" r={R} fill="none" stroke="var(--color-seam)" strokeWidth="5.5" opacity="0.4" />
       {slices.map((s) => {
         const len = (s.value / total) * 100;
@@ -66,7 +78,10 @@ function NetWorthTrend({ points }: { points: { day: string; net: number }[] }) {
   const area = `${line} L${x(points.length - 1).toFixed(1)},${zeroY.toFixed(1)} L${x(0).toFixed(1)},${zeroY.toFixed(1)} Z`;
   const color = points[points.length - 1].net >= 0 ? 'var(--color-sage)' : 'var(--color-rose)';
   const fmtDay = (d: string) =>
-    new Date(d + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+    new Date(d + 'T00:00:00').toLocaleDateString('en-IN', {
+      day: 'numeric',
+      month: 'short',
+    });
 
   return (
     <div>
@@ -78,7 +93,14 @@ function NetWorthTrend({ points }: { points: { day: string; net: number }[] }) {
         {points.length > 1 && (
           <>
             <path d={area} fill={color} opacity="0.12" />
-            <path d={line} fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+            <path
+              d={line}
+              fill="none"
+              stroke={color}
+              strokeWidth="2"
+              strokeLinejoin="round"
+              strokeLinecap="round"
+            />
           </>
         )}
         {points.map((p, i) => (
@@ -116,48 +138,103 @@ export default async function FinancePage() {
   const twoWeeksAgo = new Date(dayStart.getTime() - 13 * DAY);
   const thirtyAgo = new Date(dayStart.getTime() - 30 * DAY);
 
-  const [today, byCategory, monthIncome, recent, monthPace, allPositions, allRecurring, snapshots, profile] =
-    await Promise.all([
-      db.select().from(transactions).where(gte(transactions.ts, dayStart)).orderBy(desc(transactions.ts)).limit(50),
-      db
-        .select({ category: transactions.category, total: sql<string>`sum(${transactions.amount})` })
-        .from(transactions)
-        .where(and(gte(transactions.ts, monthStart), eq(transactions.type, 'expense')))
-        .groupBy(transactions.category)
-        .orderBy(sql`2 desc`),
-      db
-        .select({ total: sql<string>`coalesce(sum(${transactions.amount}), 0)` })
-        .from(transactions)
-        .where(and(gte(transactions.ts, monthStart), eq(transactions.type, 'income'))),
-      db
-        .select()
-        .from(transactions)
-        .where(and(gte(transactions.ts, twoWeeksAgo), eq(transactions.type, 'expense')))
-        .limit(1000),
-      db
-        .select({
-          total: sql<string>`coalesce(sum(${transactions.amount}), 0)`,
-          first: sql<string>`min(${transactions.ts})`,
-        })
-        .from(transactions)
-        .where(and(gte(transactions.ts, thirtyAgo), eq(transactions.type, 'expense'))),
-      db.select().from(positions).orderBy(desc(positions.value)),
-      db.select().from(recurring).orderBy(desc(recurring.amount)),
-      db.select().from(networthSnapshots).orderBy(asc(networthSnapshots.day)).limit(365),
-      getProfile(),
-    ]);
+  const [
+    today,
+    byCategory,
+    monthIncome,
+    recent,
+    monthPace,
+    allPositions,
+    allRecurring,
+    snapshots,
+    profile,
+    monthBillPayments,
+  ] = await Promise.all([
+    db
+      .select()
+      .from(transactions)
+      .where(gte(transactions.ts, dayStart))
+      .orderBy(desc(transactions.ts))
+      .limit(50),
+    db
+      .select({
+        category: transactions.category,
+        total: sql<string>`sum(${transactions.amount})`,
+      })
+      .from(transactions)
+      .where(and(gte(transactions.ts, monthStart), eq(transactions.type, 'expense')))
+      .groupBy(transactions.category)
+      .orderBy(sql`2 desc`),
+    db
+      .select({ total: sql<string>`coalesce(sum(${transactions.amount}), 0)` })
+      .from(transactions)
+      .where(and(gte(transactions.ts, monthStart), eq(transactions.type, 'income'))),
+    // Both exclude bill payments: the 14-day chart and the variable pace are
+    // about day-to-day spending — bills are already counted via `recurring`.
+    db
+      .select()
+      .from(transactions)
+      .where(
+        and(
+          gte(transactions.ts, twoWeeksAgo),
+          eq(transactions.type, 'expense'),
+          isNull(transactions.recurringId),
+        ),
+      )
+      .limit(1000),
+    db
+      .select({
+        total: sql<string>`coalesce(sum(${transactions.amount}), 0)`,
+        first: sql<string>`min(${transactions.ts})`,
+      })
+      .from(transactions)
+      .where(
+        and(
+          gte(transactions.ts, thirtyAgo),
+          eq(transactions.type, 'expense'),
+          isNull(transactions.recurringId),
+        ),
+      ),
+    db.select().from(positions).orderBy(desc(positions.value)),
+    db.select().from(recurring).orderBy(desc(recurring.amount)),
+    db.select().from(networthSnapshots).orderBy(asc(networthSnapshots.day)).limit(365),
+    getProfile(),
+    db
+      .select({
+        recurringId: transactions.recurringId,
+        total: sql<string>`sum(${transactions.amount})`,
+      })
+      .from(transactions)
+      .where(
+        and(
+          gte(transactions.ts, monthStart),
+          eq(transactions.type, 'expense'),
+          isNotNull(transactions.recurringId),
+        ),
+      )
+      .groupBy(transactions.recurringId),
+  ]);
 
   // ---- month numbers ----
   const monthSpend = byCategory.reduce((s, c) => s + Number(c.total), 0);
   const incomeMonth = Number(monthIncome[0]?.total ?? 0);
   const todaySpend = today.filter((t) => t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0);
+  // Bills vs daily: a payment linked to a recurring rule is a bill; the rest is
+  // day-to-day spending. Same total, two very different stories.
+  const paidByBill = new Map(monthBillPayments.map((b) => [b.recurringId!, Number(b.total)]));
+  const billsPaid = [...paidByBill.values()].reduce((s, v) => s + v, 0);
+  const dailySpend = monthSpend - billsPaid;
 
   // ---- donut slices: fixed color per category, rest folds ----
   const colored = byCategory.filter((c) => CATEGORY_COLORS[c.category]);
   const folded = byCategory.filter((c) => !CATEGORY_COLORS[c.category]);
   const foldTotal = folded.reduce((s, c) => s + Number(c.total), 0);
   const slices = [
-    ...colored.map((c) => ({ label: c.category, value: Number(c.total), color: CATEGORY_COLORS[c.category] })),
+    ...colored.map((c) => ({
+      label: c.category,
+      value: Number(c.total),
+      color: CATEGORY_COLORS[c.category],
+    })),
     ...(foldTotal > 0 ? [{ label: 'everything else', value: foldTotal, color: FOLD_COLOR }] : []),
   ];
 
@@ -176,7 +253,9 @@ export default async function FinancePage() {
 
   // ---- recurring + forecast ----
   const activeRec = allRecurring.filter((r) => r.active);
-  const recurringExp = activeRec.filter((r) => r.type === 'expense').reduce((s, r) => s + Number(r.amount), 0);
+  const recurringExp = activeRec
+    .filter((r) => r.type === 'expense')
+    .reduce((s, r) => s + Number(r.amount), 0);
   const recurringInc = activeRec.filter((r) => r.type === 'income').reduce((s, r) => s + Number(r.amount), 0);
   // Variable pace: what I actually logged in the last 30 days, scaled to a month.
   const paceDays = monthPace[0]?.first
@@ -186,12 +265,20 @@ export default async function FinancePage() {
   const forecast = recurringExp + plannedPayments + variableMonthly;
 
   // ---- daily spend, last 14 days (IST) ----
-  const days: { key: string; label: string; total: number; isToday: boolean }[] = [];
+  const days: {
+    key: string;
+    label: string;
+    total: number;
+    isToday: boolean;
+  }[] = [];
   for (let i = 13; i >= 0; i--) {
     const d = new Date(dayStart.getTime() - i * DAY);
     days.push({
       key: dayKeyIST(d),
-      label: new Intl.DateTimeFormat('en-IN', { weekday: 'narrow', timeZone: 'Asia/Kolkata' }).format(d),
+      label: new Intl.DateTimeFormat('en-IN', {
+        weekday: 'narrow',
+        timeZone: 'Asia/Kolkata',
+      }).format(d),
       total: 0,
       isToday: i === 0,
     });
@@ -217,8 +304,15 @@ export default async function FinancePage() {
             <p className="text-xs text-moth">today</p>
           </div>
           <div>
-            <p className="font-mono text-lg text-linen">{fmtINR(monthSpend)}</p>
-            <p className="text-xs text-moth">this month</p>
+            <p className="font-mono text-lg text-linen">{fmtINR(dailySpend)}</p>
+            <p className="text-xs text-moth">daily · month</p>
+          </div>
+          <div>
+            <p className="font-mono text-lg text-linen">
+              {fmtINR(billsPaid)}
+              <span className="text-xs text-moth"> of {fmtINRShort(recurringExp)}</span>
+            </p>
+            <p className="text-xs text-moth">bills · month</p>
           </div>
         </div>
       </section>
@@ -235,15 +329,13 @@ export default async function FinancePage() {
               {fmtINR(Math.abs(netWorth))}
             </p>
           </div>
-          {ageYears(profile.dob) !== null && (
+          {profile.dob && (
             <>
               <div className="h-12 w-px bg-seam sm:h-16" aria-hidden />
-              <div>
-                <p className="text-xs font-medium tracking-widest text-moth uppercase">Age</p>
-                <p className="mt-2 font-mono text-3xl tracking-tight text-linen sm:text-6xl">
-                  {ageYears(profile.dob)!.toFixed(2)}
-                </p>
-              </div>
+              <AgeDisplay
+                dob={profile.dob}
+                numberClass="mt-2 font-mono text-3xl tracking-tight text-linen sm:text-6xl"
+              />
             </>
           )}
         </div>
@@ -269,7 +361,17 @@ export default async function FinancePage() {
         )}
       </section>
 
-      <TxEntry />
+      <TxEntry
+        bills={activeRec
+          .filter((r) => r.type === 'expense')
+          .map((r) => ({
+            id: r.id,
+            name: r.name,
+            amount: Number(r.amount),
+            category: r.category,
+            paid: paidByBill.has(r.id),
+          }))}
+      />
 
       {/* Everything daily lives right under the entry form. */}
       <section>
@@ -287,9 +389,18 @@ export default async function FinancePage() {
                 <span className="rounded-full bg-seam/80 px-2 py-0.5 text-[10px] text-moth">
                   {t.category}
                 </span>
+                {t.recurringId && (
+                  <span className="rounded-full border border-sage/40 px-2 py-0.5 text-[10px] text-sage/90">
+                    bill
+                  </span>
+                )}
                 <span className="flex-1 truncate text-moth">{t.note}</span>
                 <span className="shrink-0 font-mono text-xs text-moth/70">
-                  {t.ts.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })}
+                  {t.ts.toLocaleTimeString('en-IN', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    timeZone: 'Asia/Kolkata',
+                  })}
                 </span>
                 <TxDelete id={t.id} />
               </li>
@@ -311,7 +422,9 @@ export default async function FinancePage() {
                 </span>
                 <div
                   className={`w-full rounded-t ${d.isToday ? 'bg-ember' : 'bg-ember/60 group-hover:bg-ember/90'}`}
-                  style={{ height: `${d.total === 0 ? 2 : Math.max((d.total / maxDay) * 100, 4)}%` }}
+                  style={{
+                    height: `${d.total === 0 ? 2 : Math.max((d.total / maxDay) * 100, 4)}%`,
+                  }}
                 />
                 <span
                   className={`mt-1.5 text-center font-mono text-[9px] ${d.isToday ? 'text-ember' : 'text-moth/70'}`}
@@ -343,7 +456,11 @@ export default async function FinancePage() {
               <ul className="w-full min-w-0 flex-1 space-y-1.5 text-xs">
                 {slices.map((s) => (
                   <li key={s.label} className="flex items-center gap-2">
-                    <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: s.color }} aria-hidden />
+                    <span
+                      className="h-2.5 w-2.5 shrink-0 rounded-sm"
+                      style={{ background: s.color }}
+                      aria-hidden
+                    />
                     <span className="truncate text-moth">{s.label}</span>
                     <span className="ml-auto font-mono text-linen/90">{fmtINRShort(s.value)}</span>
                     <span className="w-9 text-right font-mono text-moth/60">
@@ -371,7 +488,9 @@ export default async function FinancePage() {
                   <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-seam/60">
                     <div
                       className={`h-full rounded-r-full ${r.color}`}
-                      style={{ width: `${Math.max((r.value / maxFlow) * 100, 1.5)}%` }}
+                      style={{
+                        width: `${Math.max((r.value / maxFlow) * 100, 1.5)}%`,
+                      }}
                     />
                   </div>
                   <span className="w-20 shrink-0 text-right font-mono text-xs text-linen/90">
@@ -385,7 +504,9 @@ export default async function FinancePage() {
               <span className={`font-mono ${incomeMonth - monthSpend >= 0 ? 'text-sage' : 'text-rose'}`}>
                 {incomeMonth - monthSpend >= 0 ? '+' : '−'}
                 {fmtINR(Math.abs(incomeMonth - monthSpend))}
-              </span>
+              </span>{' '}
+              · out = <span className="font-mono">{fmtINR(billsPaid)}</span> bills +{' '}
+              <span className="font-mono">{fmtINR(dailySpend)}</span> daily
             </p>
           </div>
 
@@ -401,8 +522,8 @@ export default async function FinancePage() {
               {recurringInc > 0 ? ` · ${fmtINR(recurringInc)}/mo income` : ''}
             </p>
             <p className="mt-1.5 text-[10px] text-moth/60">
-              estimate from the last {Math.round(paceDays) || 0} day{Math.round(paceDays) === 1 ? '' : 's'} of
-              logged spends — gets sharper as you log
+              estimate from the last {Math.round(paceDays) || 0} day
+              {Math.round(paceDays) === 1 ? '' : 's'} of logged spends — gets sharper as you log
             </p>
           </div>
         </div>
@@ -412,7 +533,9 @@ export default async function FinancePage() {
         <div className="mb-3 flex items-baseline justify-between">
           <h2 className="text-xs font-medium tracking-widest text-moth uppercase">
             Net worth
-            <span className={`ml-3 font-mono text-sm normal-case ${netWorth >= 0 ? 'text-sage' : 'text-rose'}`}>
+            <span
+              className={`ml-3 font-mono text-sm normal-case ${netWorth >= 0 ? 'text-sage' : 'text-rose'}`}
+            >
               {netWorth >= 0 ? '' : '−'}
               {fmtINR(Math.abs(netWorth))}
             </span>
@@ -421,8 +544,18 @@ export default async function FinancePage() {
         <div className="grid gap-4 md:grid-cols-2">
           {(
             [
-              { kind: 'asset', label: 'Assets', items: assets, total: assetTotal },
-              { kind: 'liability', label: 'Liabilities', items: liabilities, total: liabilityTotal },
+              {
+                kind: 'asset',
+                label: 'Assets',
+                items: assets,
+                total: assetTotal,
+              },
+              {
+                kind: 'liability',
+                label: 'Liabilities',
+                items: liabilities,
+                total: liabilityTotal,
+              },
             ] as const
           ).map((col) => (
             <div key={col.kind} className="space-y-2">
@@ -435,7 +568,8 @@ export default async function FinancePage() {
               </div>
               {col.items.length === 0 ? (
                 <p className="rounded-xl border border-seam bg-veil/30 px-4 py-3 text-xs text-moth/70">
-                  Nothing here yet — add {col.kind === 'asset' ? 'bank balances, investments…' : 'loans, dues…'}
+                  Nothing here yet — add{' '}
+                  {col.kind === 'asset' ? 'bank balances, investments…' : 'loans, dues…'}
                 </p>
               ) : (
                 <ul className="divide-y divide-seam/60 rounded-xl border border-seam bg-veil/50">
@@ -454,11 +588,28 @@ export default async function FinancePage() {
           <h2 className="text-xs font-medium tracking-widest text-moth uppercase">
             Recurring
             <span className="ml-3 font-mono text-[11px] normal-case text-linen/80">
-              −{fmtINR(recurringExp)}/mo{recurringInc > 0 ? ` · +${fmtINR(recurringInc)}/mo` : ''}
+              −{fmtINR(recurringExp)}/mo
+              {recurringInc > 0 ? ` · +${fmtINR(recurringInc)}/mo` : ''}
             </span>
           </h2>
           <AddRecurring />
         </div>
+        {recurringExp > 0 && (
+          <div className="mb-3">
+            <div className="h-1.5 overflow-hidden rounded-full bg-seam/60">
+              <div
+                className="h-full rounded-r-full bg-sage"
+                style={{
+                  width: `${Math.min((billsPaid / recurringExp) * 100, 100)}%`,
+                }}
+              />
+            </div>
+            <p className="mt-1.5 text-xs text-moth">
+              <span className="font-mono text-linen/90">{fmtINR(billsPaid)}</span> settled of{' '}
+              <span className="font-mono">{fmtINR(recurringExp)}</span> this month
+            </p>
+          </div>
+        )}
         {allRecurring.length === 0 ? (
           <p className="rounded-xl border border-seam bg-veil/30 px-4 py-3 text-xs text-moth/70">
             Rent, salary, subscriptions — add them once and the forecast uses them every month.
@@ -466,7 +617,7 @@ export default async function FinancePage() {
         ) : (
           <ul className="divide-y divide-seam/60 rounded-xl border border-seam bg-veil/50">
             {allRecurring.map((r) => (
-              <RecurringRow key={r.id} item={r as Recurring} />
+              <RecurringRow key={r.id} item={r as Recurring} paidThisMonth={paidByBill.get(r.id)} />
             ))}
           </ul>
         )}

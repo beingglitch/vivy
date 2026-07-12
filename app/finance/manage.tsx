@@ -69,7 +69,10 @@ export function PositionRow({ item, max }: { item: Position; max: number }) {
       {/* On phones the bar wraps to its own full-width line so the row never
           overflows the viewport; from sm up it sits inline as before. */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm">
-        <span className="min-w-0 flex-1 truncate text-moth sm:w-32 sm:flex-none" title={item.note ?? item.name}>
+        <span
+          className="min-w-0 flex-1 truncate text-moth sm:w-32 sm:flex-none"
+          title={item.note ?? item.name}
+        >
           {item.name}
         </span>
         {!item.consider && (
@@ -128,7 +131,11 @@ export function PositionRow({ item, max }: { item: Position; max: number }) {
           <button disabled={busy} className={primaryBtn}>
             Save
           </button>
-          <button type="button" onClick={() => setEditing(false)} className="text-xs text-moth hover:text-linen">
+          <button
+            type="button"
+            onClick={() => setEditing(false)}
+            className="text-xs text-moth hover:text-linen"
+          >
             cancel
           </button>
           <button
@@ -160,7 +167,12 @@ export function AddPosition({ kind }: { kind: 'asset' | 'liability' }) {
     e.preventDefault();
     if (!name.trim() || !(Number(value) >= 0)) return;
     setBusy(true);
-    await call('/api/positions', 'POST', { kind, name: name.trim(), value: Number(value), category });
+    await call('/api/positions', 'POST', {
+      kind,
+      name: name.trim(),
+      value: Number(value),
+      category,
+    });
     setName('');
     setValue('');
     setBusy(false);
@@ -209,7 +221,8 @@ export function AddPosition({ kind }: { kind: 'asset' | 'liability' }) {
 }
 
 // Recurring rule row: name · ₹/mo · day; toggle pauses it, ✎ edits.
-export function RecurringRow({ item }: { item: Recurring }) {
+// paidThisMonth is the sum already settled toward it (from linked transactions).
+export function RecurringRow({ item, paidThisMonth }: { item: Recurring; paidThisMonth?: number }) {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(item.name);
   const [amount, setAmount] = useState(item.amount);
@@ -237,6 +250,11 @@ export function RecurringRow({ item }: { item: Recurring }) {
           {item.type === 'income' ? '↑' : '↓'}
         </span>
         <span className="flex-1 truncate text-linen/90">{item.name}</span>
+        {paidThisMonth != null && (
+          <span title={`${fmtINR(paidThisMonth)} settled this month`} className="shrink-0 text-xs text-sage">
+            ✓
+          </span>
+        )}
         <span className="rounded-full bg-seam/80 px-2 py-0.5 text-[10px] text-moth">{item.category}</span>
         {item.dayOfMonth && (
           <span className="shrink-0 font-mono text-[10px] text-moth/70">day {item.dayOfMonth}</span>
@@ -246,7 +264,9 @@ export function RecurringRow({ item }: { item: Recurring }) {
         </span>
         <button
           onClick={async () => {
-            await call(`/api/recurring/${item.id}`, 'PATCH', { active: !item.active });
+            await call(`/api/recurring/${item.id}`, 'PATCH', {
+              active: !item.active,
+            });
             router.refresh();
           }}
           title={item.active ? 'Pause' : 'Resume'}
@@ -281,7 +301,11 @@ export function RecurringRow({ item }: { item: Recurring }) {
           <button disabled={busy} className={primaryBtn}>
             Save
           </button>
-          <button type="button" onClick={() => setEditing(false)} className="text-xs text-moth hover:text-linen">
+          <button
+            type="button"
+            onClick={() => setEditing(false)}
+            className="text-xs text-moth hover:text-linen"
+          >
             cancel
           </button>
           <button

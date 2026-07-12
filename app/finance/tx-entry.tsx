@@ -5,9 +5,17 @@ import { useRouter } from 'next/navigation';
 import { TX_CATEGORIES, INCOME_CATEGORIES } from '@/lib/finance';
 import { VoiceButton } from '@/app/voice-button';
 
+export type Bill = {
+  id: string;
+  name: string;
+  amount: number;
+  category: string;
+  paid: boolean;
+};
+
 // Speed is the whole design: type the amount, tap a category — saved.
 // The note is optional and never blocks the save.
-export function TxEntry() {
+export function TxEntry({ bills = [] }: { bills?: Bill[] }) {
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
   const [mode, setMode] = useState<'expense' | 'income'>('expense');
@@ -26,7 +34,12 @@ export function TxEntry() {
     const res = await fetch('/api/transactions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ amount: n, category, type: mode, note: note.trim() || null }),
+      body: JSON.stringify({
+        amount: n,
+        category,
+        type: mode,
+        note: note.trim() || null,
+      }),
     });
     setBusy(false);
     if (res.ok) {
@@ -34,6 +47,33 @@ export function TxEntry() {
       setAmount('');
       setNote('');
       amountRef.current?.focus();
+      setTimeout(() => setFlash(''), 2500);
+      router.refresh();
+    }
+  }
+
+  // One tap settles a bill. A typed amount overrides the usual one (bills like
+  // electricity vary month to month).
+  async function payBill(bill: Bill) {
+    const typed = Number(amount);
+    const n = Number.isFinite(typed) && typed > 0 ? typed : bill.amount;
+    setBusy(true);
+    const res = await fetch('/api/transactions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        amount: n,
+        category: bill.category,
+        type: 'expense',
+        note: bill.name,
+        recurringId: bill.id,
+      }),
+    });
+    setBusy(false);
+    if (res.ok) {
+      setFlash(`₹${n} · ${bill.name} — bill settled`);
+      setAmount('');
+      setNote('');
       setTimeout(() => setFlash(''), 2500);
       router.refresh();
     }
@@ -91,8 +131,33 @@ export function TxEntry() {
           </button>
         ))}
       </div>
+      {mode === 'expense' && bills.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5 border-t border-seam/60 pt-3">
+          <span className="mr-1 text-[11px] text-moth">bills</span>
+          {bills.map((b) =>
+            b.paid ? (
+              <span
+                key={b.id}
+                className="rounded-full border border-sage/40 px-3 py-1.5 text-xs text-sage/80"
+              >
+                ✓ {b.name}
+              </span>
+            ) : (
+              <button
+                key={b.id}
+                onClick={() => payBill(b)}
+                disabled={busy}
+                title={`Settle ${b.name} — uses the typed amount if you entered one`}
+                className="rounded-full border border-seam bg-night px-3 py-1.5 text-xs text-moth transition-colors hover:border-ember/60 hover:text-linen active:bg-ember active:text-night disabled:opacity-50"
+              >
+                {b.name} <span className="font-mono text-moth/70">₹{b.amount.toLocaleString('en-IN')}</span>
+              </button>
+            ),
+          )}
+        </div>
+      )}
       <p className="text-xs text-moth/70" aria-live="polite">
-        {flash || 'Type the amount, tap a category — done.'}
+        {flash || 'Type the amount, tap a category — done. Tap a bill to settle it for the month.'}
       </p>
     </section>
   );
