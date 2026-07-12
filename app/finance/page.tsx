@@ -223,6 +223,10 @@ export default async function FinancePage() {
   const paidByBill = new Map(monthBillPayments.map((b) => [b.recurringId!, Number(b.total)]));
   const billsPaid = [...paidByBill.values()].reduce((s, v) => s + v, 0);
   const dailySpend = monthSpend - billsPaid;
+  // The header's "daily" is just today — the other two lenses are month-wide.
+  const todayDaily = today
+    .filter((t) => t.type === 'expense' && !t.recurringId)
+    .reduce((s, t) => s + Number(t.amount), 0);
 
   // ---- donut slices: fixed color per category, rest folds ----
   const colored = byCategory.filter((c) => CATEGORY_COLORS[c.category]);
@@ -300,7 +304,7 @@ export default async function FinancePage() {
         {/* One month, three lenses: daily (non-recurring only) + recurring = monthly. */}
         <div className="flex gap-6 text-right">
           <div>
-            <p className="font-mono text-lg text-linen">{fmtINR(dailySpend)}</p>
+            <p className="font-mono text-lg text-linen">{fmtINR(todayDaily)}</p>
             <p className="text-xs text-moth">daily</p>
           </div>
           <div>
