@@ -20,20 +20,29 @@ const primaryBtn =
 export function TaskList({ initial }: { initial: Task[] }) {
   const [title, setTitle] = useState('');
   const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
   const router = useRouter();
 
   async function addTask(e: React.FormEvent) {
     e.preventDefault();
     if (!title.trim()) return;
     setBusy(true);
-    await fetch('/api/tasks', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: title.trim() }),
-    });
-    setTitle('');
-    setBusy(false);
-    router.refresh();
+    setFailed(false);
+    try {
+      const res = await fetch('/api/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: title.trim() }),
+      });
+      if (!res.ok) throw new Error(`add task ${res.status}`);
+      // Only clear once it's really saved — a failed save keeps your words.
+      setTitle('');
+      router.refresh();
+    } catch {
+      setFailed(true);
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function patch(id: string, body: Record<string, unknown>) {
@@ -53,17 +62,28 @@ export function TaskList({ initial }: { initial: Task[] }) {
 
   return (
     <div className="space-y-8">
-      <form onSubmit={addTask} className="flex gap-2">
-        <input
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="Add a task…"
-          className={`flex-1 ${inputCls}`}
-        />
-        <button disabled={busy} className={primaryBtn}>
-          Add
-        </button>
-      </form>
+      <div>
+        <form onSubmit={addTask} className="flex gap-2">
+          <input
+            value={title}
+            onChange={(e) => {
+              setTitle(e.target.value);
+              if (failed) setFailed(false);
+            }}
+            placeholder="Add a task…"
+            aria-invalid={failed}
+            className={`flex-1 ${inputCls}`}
+          />
+          <button disabled={busy} className={primaryBtn}>
+            Add
+          </button>
+        </form>
+        {failed && (
+          <p role="alert" className="mt-2 text-xs text-rose">
+            Couldn&apos;t save that — check your connection and press Add again.
+          </p>
+        )}
+      </div>
 
       {proposed.length > 0 && (
         <section>
