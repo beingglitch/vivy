@@ -327,8 +327,13 @@ async function handleMessage(msg: Json): Promise<Json | null> {
 }
 
 function authorized(secret: string): boolean {
-  const expected = process.env.MCP_SECRET;
-  return !!expected && expected.length >= 24 && timingSafeEqual(secret, expected);
+  // Forgive the usual `vercel env add` paste accidents: surrounding quotes,
+  // stray whitespace, or the whole `MCP_SECRET=...` line.
+  const expected = (process.env.MCP_SECRET ?? '')
+    .trim()
+    .replace(/^MCP_SECRET=/, '')
+    .replace(/^["']|["']$/g, '');
+  return expected.length >= 24 && timingSafeEqual(secret, expected);
 }
 
 export async function POST(req: NextRequest, ctx: { params: Promise<{ secret: string }> }) {
