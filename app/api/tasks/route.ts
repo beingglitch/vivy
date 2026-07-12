@@ -24,6 +24,7 @@ export async function POST(req: NextRequest) {
       status: body.status ?? 'inbox',
       priority: body.priority ?? 2,
       due: body.due ?? null,
+      projectId: typeof body.projectId === 'string' ? body.projectId : null,
       aiProposed: body.aiProposed ?? false,
     })
     .returning();

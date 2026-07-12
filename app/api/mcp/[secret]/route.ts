@@ -1,7 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { and, desc, eq, gte, sql } from 'drizzle-orm';
-import { db, briefs, events, memories, positions, recurring, tasks, transactions } from '@/lib/db';
+import {
+  db,
+  briefs,
+  events,
+  memories,
+  positions,
+  projects,
+  recurring,
+  routines,
+  tasks,
+  transactions,
+} from '@/lib/db';
 import { TX_CATEGORIES, INCOME_CATEGORIES, fmtINR } from '@/lib/finance';
+import { istToday, weekMonday } from '@/lib/routines';
 
 // MCP server (Streamable HTTP, stateless) so claude.ai can connect to Vivy as
 // a custom connector. No OAuth: the connector UI can't send custom headers, so
@@ -69,7 +81,8 @@ const TOOLS = [
   },
   {
     name: 'add_task',
-    description: "Add a task to Suraj's inbox.",
+    description:
+      "Add a task to Suraj's inbox. Optionally file it under one of his areas/projects by name (e.g. 'startup', 'job hunt', 'iot lab', 'whisper').",
     inputSchema: {
       type: 'object',
       properties: {
@@ -77,6 +90,7 @@ const TOOLS = [
         detail: { type: 'string' },
         due: { type: 'string', description: 'YYYY-MM-DD' },
         priority: { type: 'number', description: '1 high · 2 normal · 3 low' },
+        project: { type: 'string', description: 'area or project name to file this under' },
       },
       required: ['title'],
       additionalProperties: false,
@@ -84,8 +98,18 @@ const TOOLS = [
   },
   {
     name: 'list_tasks',
-    description: 'List open tasks (inbox, today, doing) with their ids.',
+    description: 'List open tasks (inbox, today, doing) with their ids, grouped by area/project.',
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+  },
+  {
+    name: 'log_routine',
+    description:
+      "Mark one of Suraj's routines (football, gym, …) as done today. Returns weekly progress. Call with no name to see the routines.",
+    inputSchema: {
+      type: 'object',
+      properties: { name: { type: 'string', description: 'routine name (fuzzy match ok)' } },
+      additionalProperties: false,
+    },
   },
   {
     name: 'complete_task',
@@ -99,7 +123,8 @@ const TOOLS = [
   },
   {
     name: 'add_memory',
-    description: "Save a durable fact about Suraj (Vivy injects these into its AI context). Use for preferences, goals, life facts — not for one-off chatter.",
+    description:
+      'Save a durable fact about Suraj (Vivy injects these into its AI context). Use for preferences, goals, life facts — not for one-off chatter.',
     inputSchema: {
       type: 'object',
       properties: { content: { type: 'string' } },
@@ -203,6 +228,22 @@ async function runTool(name: string, args: Json): Promise<string> {
     case 'add_task': {
       const title = typeof args.title === 'string' ? args.title.trim() : '';
       if (!title) throw new Error('title required');
+      // File under an area/project when the name matches one; never guess-create.
+      let projectId: string | null = null;
+      let filed = '';
+      if (typeof args.project === 'string' && args.project.trim()) {
+        const want = args.project.trim().toLowerCase();
+        const all = await db.select().from(projects).where(eq(projects.status, 'active'));
+        const hit =
+          all.find((p) => p.name.toLowerCase() === want || p.slug === want) ??
+          all.find((p) => p.name.toLowerCase().includes(want));
+        if (hit) {
+          projectId = hit.id;
+          filed = ` → filed under ${hit.name}`;
+        } else {
+          filed = ` (no area/project named "${args.project}" — left in inbox; existing: ${all.map((p) => p.name).join(', ') || 'none'})`;
+        }
+      }
       const [row] = await db
         .insert(tasks)
         .values({
@@ -210,21 +251,74 @@ async function runTool(name: string, args: Json): Promise<string> {
           detail: typeof args.detail === 'string' ? args.detail : null,
           due: typeof args.due === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(args.due) ? args.due : null,
           priority: [1, 2, 3].includes(Number(args.priority)) ? Number(args.priority) : 2,
+          projectId,
         })
         .returning();
-      return `Task added: "${row.title}" (id ${row.id})`;
+      return `Task added: "${row.title}" (id ${row.id})${filed}`;
     }
     case 'list_tasks': {
-      const rows = await db
-        .select()
-        .from(tasks)
-        .where(sql`${tasks.status} in ('inbox','today','doing')`)
-        .orderBy(tasks.priority, desc(tasks.createdAt))
-        .limit(50);
+      const [rows, projectRows] = await Promise.all([
+        db
+          .select()
+          .from(tasks)
+          .where(sql`${tasks.status} in ('inbox','today','doing')`)
+          .orderBy(tasks.priority, desc(tasks.createdAt))
+          .limit(50),
+        db.select().from(projects),
+      ]);
       if (rows.length === 0) return 'No open tasks.';
-      return rows
-        .map((t) => `[${t.status}] ${t.title}${t.due ? ` (due ${t.due})` : ''} · id ${t.id}`)
-        .join('\n');
+      const nameOf = new Map(projectRows.map((p) => [p.id, p.name]));
+      const groups = new Map<string, string[]>();
+      for (const t of rows) {
+        const key = (t.projectId && nameOf.get(t.projectId)) || 'Inbox';
+        const line = `  [${t.status}] ${t.title}${t.due ? ` (due ${t.due})` : ''} · id ${t.id}`;
+        groups.set(key, [...(groups.get(key) ?? []), line]);
+      }
+      return [...groups.entries()].map(([g, lines]) => `${g}:\n${lines.join('\n')}`).join('\n');
+    }
+    case 'log_routine': {
+      const all = await db.select().from(routines).where(eq(routines.active, true));
+      const today = istToday();
+      const monday = weekMonday(today);
+      const weekDone = await db
+        .select({ payload: events.payload })
+        .from(events)
+        .where(and(eq(events.type, 'routine.done'), sql`${events.payload}->>'day' >= ${monday}`));
+      const doneDays = (rid: string) =>
+        weekDone
+          .map((e) => e.payload as { routineId?: string; day?: string })
+          .filter((p) => p.routineId === rid)
+          .map((p) => p.day!);
+      const summary = (r: (typeof all)[number]) => {
+        const days = doneDays(r.id);
+        const sched = r.timesPerWeek
+          ? `${days.length} of ${r.timesPerWeek} this week`
+          : `${days.length} this week`;
+        return `- ${r.name}: ${sched}${days.includes(today) ? ' (done today ✓)' : ''}`;
+      };
+      const want = typeof args.name === 'string' ? args.name.trim().toLowerCase() : '';
+      if (!want) {
+        return all.length ? `Routines:\n${all.map(summary).join('\n')}` : 'No routines set up yet.';
+      }
+      const hit =
+        all.find((r) => r.name.toLowerCase() === want) ??
+        all.find((r) => r.name.toLowerCase().includes(want));
+      if (!hit) {
+        throw new Error(
+          `no routine matching "${args.name}" — have: ${all.map((r) => r.name).join(', ') || 'none'}`,
+        );
+      }
+      if (doneDays(hit.id).includes(today)) {
+        return `${hit.name} was already logged today. ${summary(hit).slice(2)}`;
+      }
+      await db.insert(events).values({
+        source: 'mcp',
+        type: 'routine.done',
+        title: hit.name,
+        payload: { routineId: hit.id, day: today },
+      });
+      const count = doneDays(hit.id).length + 1;
+      return `Logged: ${hit.name} today ✓ (${hit.timesPerWeek ? `${count} of ${hit.timesPerWeek} this week` : `${count} this week`})`;
     }
     case 'complete_task': {
       const id = typeof args.id === 'string' ? args.id : '';
@@ -254,7 +348,10 @@ async function runTool(name: string, args: Json): Promise<string> {
         .limit(100);
       if (rows.length === 0) return `No events in the last ${days} day(s).`;
       return rows
-        .map((e) => `${e.ts.toISOString().slice(0, 16).replace('T', ' ')} [${e.source}/${e.type}] ${e.title ?? ''}`)
+        .map(
+          (e) =>
+            `${e.ts.toISOString().slice(0, 16).replace('T', ' ')} [${e.source}/${e.type}] ${e.title ?? ''}`,
+        )
         .join('\n');
     }
     case 'get_daily_brief': {

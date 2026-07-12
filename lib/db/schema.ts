@@ -32,10 +32,28 @@ export const events = pgTable(
   ],
 );
 
+// Areas are ongoing responsibilities that never finish (job hunt, startup, IoT lab);
+// projects are finite and completable (whisper), optionally nested one level under an area.
 export const projects = pgTable('projects', {
   id: uuid('id').defaultRandom().primaryKey(),
   slug: text('slug').notNull().unique(), // 'startup' | 'job' | 'personal' | 'finance'
   name: text('name').notNull(),
+  kind: text('kind').notNull().default('area'), // 'area' | 'project'
+  status: text('status').notNull().default('active'), // 'active' | 'done' | 'paused'
+  parentId: uuid('parent_id'), // project under an area (self-reference, max one level)
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Recurring activities (football, gym) — a rule plus a done-log, never a self-cloning
+// task. Ticking one writes a `routine.done` event to the timeline; streaks and weekly
+// progress derive from events. Exactly one of daysOfWeek / timesPerWeek is set.
+export const routines = pgTable('routines', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  name: text('name').notNull(),
+  daysOfWeek: integer('days_of_week').array(), // 0=Sun … 6=Sat; fixed-day schedule
+  timesPerWeek: integer('times_per_week'), // weekly target (Mon–Sun week)
+  projectId: uuid('project_id').references(() => projects.id),
+  active: boolean('active').notNull().default(true),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 

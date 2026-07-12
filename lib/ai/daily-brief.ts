@@ -1,8 +1,76 @@
 import { generateText } from 'ai';
-import { and, desc, eq, gte, inArray, ne, sql } from 'drizzle-orm';
-import { db, briefs, events, learning, tasks, transactions } from '@/lib/db';
+import { and, desc, eq, gte, inArray, isNotNull, ne, sql } from 'drizzle-orm';
+import { db, briefs, events, learning, projects, routines, tasks, transactions } from '@/lib/db';
 import { browsingStats, fmtDuration } from '@/lib/browsing';
+import { istToday, dayOfWeek, weekMonday } from '@/lib/routines';
 import { VIVY_MODEL, VIVY_PERSONA, memoryContext } from './index';
+
+const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+// Routines due today (with weekly progress) + active areas/projects gone quiet —
+// the shape of the task world, so the brief can nag about silence, not just items.
+async function structureContext(): Promise<string> {
+  const today = istToday();
+  const monday = weekMonday(today);
+  const dow = dayOfWeek(today);
+
+  const [routineRows, doneEvents, projectRows, moves] = await Promise.all([
+    db.select().from(routines).where(eq(routines.active, true)).limit(100),
+    db
+      .select({ payload: events.payload })
+      .from(events)
+      .where(and(eq(events.type, 'routine.done'), sql`${events.payload}->>'day' >= ${monday}`)),
+    db.select().from(projects).where(eq(projects.status, 'active')).limit(100),
+    db
+      .select({
+        projectId: tasks.projectId,
+        open: sql<number>`count(*) filter (where ${tasks.status} in ('inbox','today','doing'))`,
+        last: sql<string>`max(greatest(${tasks.createdAt}, coalesce(${tasks.completedAt}, ${tasks.createdAt})))`,
+      })
+      .from(tasks)
+      .where(isNotNull(tasks.projectId))
+      .groupBy(tasks.projectId),
+  ]);
+  if (routineRows.length === 0 && projectRows.length === 0) return '';
+
+  const doneByRoutine = new Map<string, string[]>();
+  for (const e of doneEvents) {
+    const p = e.payload as { routineId?: string; day?: string };
+    if (!p.routineId || !p.day) continue;
+    doneByRoutine.set(p.routineId, [...(doneByRoutine.get(p.routineId) ?? []), p.day]);
+  }
+
+  const routineLines = routineRows
+    .map((r) => {
+      const days = doneByRoutine.get(r.id) ?? [];
+      if (days.includes(today)) return `- ${r.name}: done today ✓`;
+      if (r.daysOfWeek) {
+        return r.daysOfWeek.includes(dow)
+          ? `- ${r.name}: due today (${r.daysOfWeek.map((d) => DAY_NAMES[d]).join('/')})`
+          : null;
+      }
+      const target = r.timesPerWeek ?? 0;
+      return days.length < target ? `- ${r.name}: ${days.length} of ${target} this week` : null;
+    })
+    .filter(Boolean);
+
+  const moveByProject = new Map(moves.map((m) => [m.projectId!, m]));
+  const quiet = projectRows
+    .map((p) => {
+      const m = moveByProject.get(p.id);
+      if (!m) return `- ${p.name} (${p.kind}): no tasks yet`;
+      const daysQuiet = Math.floor((Date.now() - new Date(m.last).getTime()) / 86400000);
+      return daysQuiet >= 5
+        ? `- ${p.name} (${p.kind}): nothing moved for ${daysQuiet} days, ${m.open} open`
+        : null;
+    })
+    .filter(Boolean);
+
+  return (
+    (routineLines.length ? `\nRoutines needing attention today:\n${routineLines.join('\n')}` : '') +
+    (quiet.length ? `\nQuiet areas/projects (call these out):\n${quiet.join('\n')}` : '')
+  );
+}
 
 // Books/courses with days-since-last-log — the reading coach's raw material.
 async function learningContext(): Promise<string> {
@@ -32,13 +100,19 @@ async function learningContext(): Promise<string> {
     return (
       `- [${i.kind}] ${i.title}: ${i.unitsDone}${i.unitsTotal ? '/' + i.unitsTotal : ''} ${i.unitName}s, ` +
       (i.startedAt ? `started ${i.startedAt}, ` : '') +
-      (days === null ? 'no session logged yet' : days === 0 ? 'logged today' : `last session ${days} day(s) ago`)
+      (days === null
+        ? 'no session logged yet'
+        : days === 0
+          ? 'logged today'
+          : `last session ${days} day(s) ago`)
     );
   });
   return (
     `\nLearning (${active.length} active, ${backlog.length} in backlog):\n` +
     (lines.length ? lines.join('\n') : '(nothing active)') +
-    (backlog.length > 3 ? `\n(backlog has ${backlog.length} unstarted items — watch for over-collecting)` : '')
+    (backlog.length > 3
+      ? `\n(backlog has ${backlog.length} unstarted items — watch for over-collecting)`
+      : '')
   );
 }
 
@@ -53,7 +127,13 @@ async function spendContext(): Promise<string> {
     db
       .select({ total: sql<string>`coalesce(sum(${transactions.amount}), 0)` })
       .from(transactions)
-      .where(and(gte(transactions.ts, yesterday), eq(transactions.type, 'expense'), sql`${transactions.ts} < ${dayStart}`)),
+      .where(
+        and(
+          gte(transactions.ts, yesterday),
+          eq(transactions.type, 'expense'),
+          sql`${transactions.ts} < ${dayStart}`,
+        ),
+      ),
     db
       .select({ category: transactions.category, total: sql<string>`sum(${transactions.amount})` })
       .from(transactions)
@@ -132,7 +212,7 @@ export async function generateDailyBrief(): Promise<{ day: string; content: stri
   const yesterday = new Date(dayStart.getTime() - 24 * 60 * 60 * 1000);
   const day = new Date().toISOString().slice(0, 10);
 
-  const [open, doneYesterday, stats, memory, trend, learn, spend] = await Promise.all([
+  const [open, doneYesterday, stats, memory, trend, learn, spend, structure] = await Promise.all([
     db
       .select()
       .from(tasks)
@@ -149,6 +229,7 @@ export async function generateDailyBrief(): Promise<{ day: string; content: stri
     weeklyTrend(),
     learningContext(),
     spendContext(),
+    structureContext(),
   ]);
 
   const context = [
@@ -160,7 +241,10 @@ export async function generateDailyBrief(): Promise<{ day: string; content: stri
     `\nYesterday's screen time: ${fmtDuration(stats.totalBrowseSeconds)} browsing, ` +
       `${fmtDuration(stats.totalVideoSeconds)} video across ${stats.videos.length} videos.`,
     stats.searches.length
-      ? `Recent searches: ${stats.searches.slice(0, 15).map((s) => `"${s.query}"`).join(', ')}`
+      ? `Recent searches: ${stats.searches
+          .slice(0, 15)
+          .map((s) => `"${s.query}"`)
+          .join(', ')}`
       : '',
     stats.videoTypes.length
       ? `Video time by type (24h): ${stats.videoTypes.map((t) => `${t.category} ${fmtDuration(t.seconds)}`).join(', ')}`
@@ -168,6 +252,7 @@ export async function generateDailyBrief(): Promise<{ day: string; content: stri
     trend,
     learn,
     spend,
+    structure,
   ]
     .filter(Boolean)
     .join('\n');
@@ -180,7 +265,8 @@ export async function generateDailyBrief(): Promise<{ day: string; content: stri
       '**Top 3 today** (the must-dos, ranked, one-line why each — deadlines and priority 1 first), ' +
       '**Also on the list** (the rest worth touching, compressed), ' +
       '**Note from Vivy** (your coach moment: ONE honest observation from the data — a streak to protect, ' +
-      'a slowdown, a stalled book/course (days since last session), unusual spending, an overdue item I keep dodging — ' +
+      'a slowdown, a stalled book/course (days since last session), unusual spending, an overdue item I keep dodging, ' +
+      'a routine behind its weekly target, an area or project gone quiet for days — ' +
       'with the numbers that prove it and one tiny concrete next step). ' +
       'If there are AI-proposed tasks awaiting approval, remind me to review them. ' +
       'Under 250 words. No preamble — start with the first section.' +

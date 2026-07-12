@@ -11,6 +11,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   if (body.detail !== undefined) patch.detail = body.detail;
   if (body.priority !== undefined) patch.priority = body.priority;
   if (body.due !== undefined) patch.due = body.due;
+  if (body.projectId !== undefined) patch.projectId = body.projectId || null;
   if (body.aiProposed !== undefined) patch.aiProposed = body.aiProposed;
   if (body.status !== undefined) {
     patch.status = body.status;

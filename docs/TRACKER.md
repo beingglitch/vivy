@@ -55,7 +55,9 @@ Tasks are the first-class citizen: created manually, by chat, or extracted from 
 
 - [x] [x] `tasks` table: title, detail, status, priority, due, project, source-event link
 - [x] [ ] Task CRUD (API + UI): API curl-verified; UI renders but not yet clicked through in a browser
-- [ ] [ ] Projects/areas (startup, job, personal, finance) — table exists, no UI/grouping yet
+- [x] [x] Task structure [[SPEC-0007]]: areas (ongoing: startup, job hunt, IoT lab) vs projects (finite: whisper) vs routines (recurring: football, fixed-days or ×N/week) — schema + APIs + /tasks re-cut (Today lane / groups with stale badges / inbox) + organize drawer; curl-verified full round-trip 2026-07-13 (create → file task → routine toggle → grouped MCP list); UI not yet clicked in browser
+- [x] [ ] Daily brief knows the structure: routines due today + quiet areas context (`structureContext`) — SQL verified against Neon, no brief generated with it yet
+- [x] [ ] MCP additions: add_task files by project name, list_tasks grouped, new log_routine tool — verified locally, prod pending deploy
 - [x] [x] AI task extraction: any ingested text event can yield proposed tasks (approve/reject UI on /tasks) — verified 2026-07-08: note → 2 correct tasks with due dates; UI approve flow not yet clicked
 
 ### Daily brief — "what do we do today" [[SPEC-0001]]
