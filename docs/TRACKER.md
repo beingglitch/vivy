@@ -73,6 +73,7 @@ Conversational interface over all my data, with tools.
 - [x] [ ] Voice chat overlay [[SPEC-0004]]: bottom-right FAB on every page, safety mode (review draft → say "go" / oral correction via Haiku), spoken replies toggle — built 2026-07-11; needs real-mic test by user
 - [x] [ ] Vivy tools: queryTasks, createTask, completeTask, queryEvents, remember — built; untested
 - [x] [ ] Persistent memory: `remember` tool writes memories; injected into chat + brief prompts
+- [x] [x] MCP server at /api/mcp/[secret] (stateless Streamable HTTP, URL-secret auth, 10 tools over the same store) for claude.ai custom connector — curl-verified full handshake + task round-trip 2026-07-12; connector add in claude.ai pending user deploy
 
 ### Learning tracker — books & courses [[SPEC-0002]]
 One `learning` concept (kind: book|course), unit-based progress, coached in the brief.
@@ -99,7 +100,7 @@ One `learning` concept (kind: book|course), unit-based progress, coached in the 
 - [x] [x] Notion "Finance Tracker" one-time import: 10 positions (incl. 5 personal debts, college fee not-counted) + 7 recurring rules — verified in DB + UI 2026-07-11
 - [x] [ ] Recurring rules: `recurring` table + UI (add/edit/pause/remove) + next-month forecast (recurring + planned debt payments + pace) — rows render; PATCH/DELETE untested
 - [x] [ ] Voice input (Web Speech API) on chat + finance note — mic renders 2026-07-11; real dictation not yet tried
-- [x] [x] Bills vs daily split: `transactions.recurring_id`, one-tap settle chips, paid-of-total header + progress bar, daily chart/pace exclude bills — API-tested + screenshots 2026-07-12
+- [x] [x] Bills vs daily split: `transactions.recurring_id`, one-tap settle chips, paid-of-total header + progress bar, daily chart/pace exclude bills — API-tested + screenshots 2026-07-12; header re-cut to daily / monthly / recurring (daily + recurring = monthly) same day
 - [x] [ ] Age display toggle on both heroes: days-to-next-birthday ↔ years+months, persisted — countdown state screenshot-verified 2026-07-12; the tap itself needs a real click
 - [ ] [ ] Replace manual with auto-ingestion (Epic 3: SMS/Gmail/bank) — manual stays as fallback
 

@@ -218,7 +218,6 @@ export default async function FinancePage() {
   // ---- month numbers ----
   const monthSpend = byCategory.reduce((s, c) => s + Number(c.total), 0);
   const incomeMonth = Number(monthIncome[0]?.total ?? 0);
-  const todaySpend = today.filter((t) => t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0);
   // Bills vs daily: a payment linked to a recurring rule is a bill; the rest is
   // day-to-day spending. Same total, two very different stories.
   const paidByBill = new Map(monthBillPayments.map((b) => [b.recurringId!, Number(b.total)]));
@@ -298,21 +297,22 @@ export default async function FinancePage() {
           <h1 className="font-voice text-2xl italic">Finance</h1>
           <p className="mt-1 text-sm text-moth">Log it the moment it leaves your pocket.</p>
         </div>
+        {/* One month, three lenses: daily (non-recurring only) + recurring = monthly. */}
         <div className="flex gap-6 text-right">
           <div>
-            <p className="font-mono text-lg text-linen">{fmtINR(todaySpend)}</p>
-            <p className="text-xs text-moth">today</p>
+            <p className="font-mono text-lg text-linen">{fmtINR(dailySpend)}</p>
+            <p className="text-xs text-moth">daily</p>
           </div>
           <div>
-            <p className="font-mono text-lg text-linen">{fmtINR(dailySpend)}</p>
-            <p className="text-xs text-moth">daily · month</p>
+            <p className="font-mono text-lg text-linen">{fmtINR(monthSpend)}</p>
+            <p className="text-xs text-moth">monthly</p>
           </div>
           <div>
             <p className="font-mono text-lg text-linen">
               {fmtINR(billsPaid)}
               <span className="text-xs text-moth"> of {fmtINRShort(recurringExp)}</span>
             </p>
-            <p className="text-xs text-moth">bills · month</p>
+            <p className="text-xs text-moth">recurring</p>
           </div>
         </div>
       </section>
