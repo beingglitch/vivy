@@ -1,14 +1,27 @@
-# apps/android — not built yet (Epic 6)
+# apps/android — Vivy Screen Time
 
-The Android app. Planned shape:
+Minimal Kotlin app (no Compose, zero UI libraries) that ships the phone's per-app
+screen time to the Core Event API:
 
-- Wrapper around `apps/web` (Capacitor) or native Kotlin — decide as an ADR when this
-  starts. The web app is the single UI source; this shell adds what the browser can't:
-- **UsageStats** permission → daily per-app screen-time events to the Core Event API.
-- Push notifications: the web-push module (SPEC-0008) already works inside the PWA;
-  a native shell would swap in an FCM adapter next to `sendPushToAll` in
-  `apps/web/lib/notify.ts` — the notifications table/rules/bell stay unchanged.
-- Later (Epic 3): SMS listener → bank-transaction events.
+- `MainActivity` — one screen: Vivy URL + ingest key (stored in SharedPreferences),
+  a button to grant **usage access** (special permission via Settings), save & sync.
+- `UsageWorker` — WorkManager job every 6h: `UsageStatsManager` daily buckets → one
+  event `{ source: 'android', type: 'phone.usage', payload: { day, totalMinutes,
+  apps: [{ app, pkg, minutes }] } }`. Apps under a minute are dropped. Analysis takes
+  the latest snapshot per `payload.day`.
 
-Rules that apply here (from CLAUDE.md): thin client, no local database, everything is
-an event into the one timeline.
+## Build
+
+```bash
+cd apps/android && ./gradlew assembleDebug
+# app/build/outputs/apk/debug/app-debug.apk
+```
+
+CI builds this on every `v*` tag and attaches `vivy-screentime-<tag>.apk` to the
+GitHub Release; the /settings "Apps & updates" card in the web app links it for
+download. Debug-signed on purpose — personal sideload, no keystore to manage.
+
+## Install on the phone
+
+Download the APK from /settings → allow "install unknown apps" → open → grant usage
+access in the app (step 1) → paste the ingest key (step 2) → save & sync.

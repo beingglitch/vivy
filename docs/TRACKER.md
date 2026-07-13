@@ -200,25 +200,27 @@ The UI was built mobile-first; desktop used to get a stretched phone layout.
 - [ ] [ ] Second pass: finance/learning/browsing desktop compositions; brief open-by-default on desktop
 - [ ] [ ] Keyboard-first quick capture (global "add task/expense" command palette)
 
-### Desktop app (shell + OS-level tracker)
-- [ ] [ ] Pick shell (Tauri vs Electron) — record as ADR; wrap the web app + system tray
-- [ ] [ ] OS-level activity tracker: active window/app + idle detection → batched events (source 'desktop-agent') — moved from Epic 2
-- [ ] [ ] Auto-start on boot, offline queue with retry (Event API already takes batches)
+### Desktop app (re-scoped 2026-07-13: purpose is screen time, not a shell) [[SPEC-0009]]
+- [x] [x] Linux screen-time agent (apps/desktop): active seconds via Mutter IdleMonitor (Wayland), lock-aware, batched `screen.active` events w/ retry — live-verified against prod timeline 2026-07-13
+- [ ] [ ] USER: run `apps/desktop/install.sh <VIVY_INGEST_KEY>` (systemd user service; classifier blocked agent-side install)
+- [-] [ ] Shell app (Tauri/Electron) — dropped from scope; web + PWA is the interface, per user ("not necessary for desktop")
+- [ ] [ ] Per-app names on Linux (needs GNOME shell extension) — optional later
 
-### Android app
-- [ ] [ ] Pick approach (native Kotlin vs Capacitor wrapper + native module) — record as ADR
-- [ ] [ ] UsageStats permission → daily per-app screen-time events (automatic, no manual logging) — moved from Epic 2
-- [ ] [ ] Push notifications: daily brief + nudges land on the phone
+### Android app [[SPEC-0009]]
+- [x] [x] Vivy Screen Time app (apps/android): Kotlin, zero UI libs; usage-access grant screen + WorkManager 6h sync → `phone.usage` daily snapshots (per-app minutes) — assembleDebug builds locally (2.3MB APK); decision: native Kotlin, no Capacitor (purpose is tracking, web is the UI)
+- [ ] [ ] USER: install APK from /settings on the phone, grant usage access, paste ingest key; then verify `phone.usage` events in timeline
+- [ ] [ ] Push notifications: web push already works in the PWA; FCM adapter only if a native shell ever replaces it
 - [ ] [ ] (later, ties into Epic 3) SMS listener → bank-transaction events
+- [ ] [ ] Fold desktop+phone screen time into home/browsing charts (today they only count browser events)
 
 ### Repo structure & DX (pulled forward 2026-07-13)
 - [x] [x] npm-workspaces monorepo [[ADR-0002]]: apps/web (Next app moved wholesale, git history kept), apps/extension, placeholder apps/desktop + apps/android + services/analysis with intent READMEs; backend language (Python vs Rust) deliberately open — verified: install/tsc/dev server/authed pages all green from new layout
 - [ ] [ ] USER: Vercel dashboard → Settings → Build & Deployment → Root Directory = `apps/web` (required before next deploy)
 
-### CI/CD & releases
-- [x] [ ] GitHub Actions release workflow: `v*` tag → detect job → build every app that exists (extension zips today; desktop/android jobs auto-activate when their folders become real projects) → GitHub Release with generated notes — YAML-validated; first real run = first tag push
-- [ ] [ ] In-app update notification: apps check the latest release version and nudge to update
-- [ ] [ ] App version surfaced in /settings; release notes generated from commits since last tag
+### CI/CD & releases [[SPEC-0009]]
+- [x] [ ] GitHub Actions release workflow: `v*` tag → extension zip + linux-agent tarball + debug APK → GitHub Release with generated notes — YAML-validated; first real run = v0.1.0 tag
+- [x] [ ] Update surface on the web app: /api/releases (public GitHub API, 5-min cache) + "Apps & updates" card on /settings with download buttons — renders locally; shows assets once a release exists
+- [ ] [ ] In-app self-update on Android (check latest tag, prompt install) — the /settings card is the update channel until then
 - [ ] [ ] (web already ships via Vercel on every push — unchanged)
 
 **Bugs:** *(none open)*

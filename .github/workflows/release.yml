@@ -19,14 +19,12 @@ jobs:
   detect:
     runs-on: ubuntu-latest
     outputs:
-      desktop: ${{ steps.check.outputs.desktop }}
       android: ${{ steps.check.outputs.android }}
     steps:
       - uses: actions/checkout@v4
       - id: check
         run: |
-          [ -f apps/desktop/package.json ] && echo "desktop=true" >> "$GITHUB_OUTPUT" || echo "desktop=false" >> "$GITHUB_OUTPUT"
-          { [ -f apps/android/gradlew ] || [ -f apps/android/package.json ]; } && echo "android=true" >> "$GITHUB_OUTPUT" || echo "android=false" >> "$GITHUB_OUTPUT"
+          [ -f apps/android/gradlew ] && echo "android=true" >> "$GITHUB_OUTPUT" || echo "android=false" >> "$GITHUB_OUTPUT"
 
   extension:
     runs-on: ubuntu-latest
@@ -41,28 +39,20 @@ jobs:
           name: extension
           path: vivy-extension-*.zip
 
-  # Shape only — finalize the steps when the desktop ADR (Tauri vs Electron)
-  # is decided. The job stays skipped until apps/desktop/package.json exists.
-  desktop:
-    needs: detect
-    if: needs.detect.outputs.desktop == 'true'
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+  # The Linux screen-time agent ships as a tarball: agent.js + install.sh.
+  desktop-agent:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-      - run: npm ci
-      - run: npm run build -w desktop
+      - name: Pack the Linux agent
+        run: tar -czf "vivy-linux-agent-${GITHUB_REF_NAME}.tar.gz" -C apps desktop
       - uses: actions/upload-artifact@v4
         with:
-          name: desktop-${{ matrix.os }}
-          path: apps/desktop/dist/**
+          name: desktop-agent
+          path: vivy-linux-agent-*.tar.gz
 
-  # Shape only — finalize when the android ADR (Kotlin vs Capacitor) is decided.
+  # Debug-signed APK — installable by sideload, no keystore to manage.
+  # (Move to a signed release build if this ever goes beyond personal use.)
   android:
     needs: detect
     if: needs.detect.outputs.android == 'true'
@@ -72,21 +62,23 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 21
+          java-version: 17
       - name: Build APK
         run: |
           cd apps/android
-          ./gradlew assembleRelease
+          echo "sdk.dir=$ANDROID_HOME" > local.properties
+          ./gradlew assembleDebug
+          mv app/build/outputs/apk/debug/app-debug.apk "../../vivy-screentime-${GITHUB_REF_NAME}.apk"
       - uses: actions/upload-artifact@v4
         with:
           name: android
-          path: apps/android/app/build/outputs/apk/release/*.apk
+          path: vivy-screentime-*.apk
 
   release:
-    needs: [detect, extension, desktop, android]
+    needs: [detect, extension, desktop-agent, android]
     # run once everything that applies has finished; skipped jobs are fine,
     # failed builds are not
-    if: ${{ !cancelled() && needs.extension.result == 'success' && needs.desktop.result != 'failure' && needs.android.result != 'failure' }}
+    if: ${{ !cancelled() && needs.extension.result == 'success' && needs['desktop-agent'].result == 'success' && needs.android.result != 'failure' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4

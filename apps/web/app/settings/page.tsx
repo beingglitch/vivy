@@ -1,6 +1,7 @@
 import { getProfile } from '@/lib/settings';
 import { ProfileForm } from './profile-form';
 import { PushToggle } from './push-toggle';
+import { AppsCard } from './apps-card';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,6 +15,7 @@ export default async function SettingsPage() {
       </div>
       <ProfileForm initial={profile} />
       <PushToggle />
+      <AppsCard />
     </main>
   );
 }
