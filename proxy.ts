@@ -31,6 +31,7 @@ export default async function proxy(req: NextRequest) {
 }
 
 export const config = {
-  // manifest + icons stay public so the PWA can install from the login screen.
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|.*\\.svg|.*\\.png).*)'],
+  // manifest + icons stay public so the PWA can install from the login screen;
+  // sw.js too, so the browser can re-fetch the push worker without a session.
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|sw.js|.*\\.svg|.*\\.png).*)'],
 };

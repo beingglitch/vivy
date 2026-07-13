@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateDailyBrief } from '@/lib/ai/daily-brief';
 import { processEvents } from '@/lib/ai/process-events';
+import { morningNudge } from '@/lib/notify';
 import { verifySessionValue, SESSION_COOKIE } from '@/lib/auth';
 
 export const maxDuration = 300;
@@ -23,5 +24,9 @@ export async function GET(req: NextRequest) {
     error: err instanceof Error ? err.message : String(err),
   }));
   const brief = await generateDailyBrief();
-  return NextResponse.json({ ok: true, processed, ...brief });
+  // push the headline to my devices — a brief nobody sees is a diary
+  const nudge = await morningNudge(brief.content).catch((err) => ({
+    error: err instanceof Error ? err.message : String(err),
+  }));
+  return NextResponse.json({ ok: true, processed, nudge, ...brief });
 }

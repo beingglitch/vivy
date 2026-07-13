@@ -1,5 +1,6 @@
 import { getProfile } from '@/lib/settings';
 import { ProfileForm } from './profile-form';
+import { PushToggle } from './push-toggle';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,6 +13,7 @@ export default async function SettingsPage() {
         <p className="mt-1 text-sm text-moth">Who you are — Vivy uses this everywhere.</p>
       </div>
       <ProfileForm initial={profile} />
+      <PushToggle />
     </main>
   );
 }

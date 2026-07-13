@@ -173,8 +173,9 @@ One `learning` concept (kind: book|course), unit-based progress, coached in the 
 - [ ] [ ] Auto-merge trivial PR classes (copy/docs) once PR quality is proven
 
 ### Nudges & reviews
+- [x] [x] Notification module [[SPEC-0008]]: web push (VAPID) + in-app bell + /notifications; rules × Haiku wording — morning brief headline (rides brief cron), midday overspend check (14:00 IST, >2× 30-day avg and >₹500), evening review (21:30 IST: done count, leftovers, routines owed, stalled learning, due-tomorrow → "line up tomorrow"); per-day dedupe — cron/dedupe/bell/page verified locally 2026-07-13; real device push pending user enable + Vercel VAPID env vars
 - [ ] [ ] Weekly review generated Sunday evening (wins, slips, next week's focus)
-- [ ] [ ] Real-time nudges via push channel (screen time, deadlines, dues)
+- [ ] [ ] Real-time nudges (screen time, dues) beyond the three daily slots
 - [ ] [ ] Startup & job dashboards: goals, metrics I log, Vivy tracks progress
 
 ### Deeper memory

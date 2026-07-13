@@ -205,6 +205,35 @@ export const papers = pgTable('papers', {
   suggestedAt: timestamp('suggested_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+// Nudges Vivy sends me (web push + in-app bell). Rules decide when, Haiku words
+// them; dedupeKey (kind + IST day) guarantees the same nag never fires twice.
+export const notifications = pgTable(
+  'notifications',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    ts: timestamp('ts', { withTimezone: true }).notNull().defaultNow(),
+    kind: text('kind').notNull(), // 'morning' | 'spend' | 'evening' | 'system'
+    title: text('title').notNull(),
+    body: text('body').notNull(),
+    url: text('url'), // where tapping it lands
+    dedupeKey: text('dedupe_key').notNull().unique(),
+    readAt: timestamp('read_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('notifications_ts_idx').on(t.ts)],
+);
+
+// Web-push subscriptions (one per browser/device that tapped "enable").
+// Dead endpoints (404/410 on send) are deleted automatically.
+export const pushSubscriptions = pgTable('push_subscriptions', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  endpoint: text('endpoint').notNull().unique(),
+  p256dh: text('p256dh').notNull(),
+  auth: text('auth').notNull(),
+  userAgent: text('user_agent'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const chatMessages = pgTable('chat_messages', {
   id: uuid('id').defaultRandom().primaryKey(),
   role: text('role').notNull(), // 'user' | 'assistant'

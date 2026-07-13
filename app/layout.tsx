@@ -1,43 +1,44 @@
-import type { Metadata, Viewport } from "next";
-import Link from "next/link";
-import { Fraunces, Instrument_Sans, Geist_Mono } from "next/font/google";
-import { VivyFab } from "./vivy-fab";
-import { MobileTabs } from "./mobile-tabs";
-import "./globals.css";
+import type { Metadata, Viewport } from 'next';
+import Link from 'next/link';
+import { Fraunces, Instrument_Sans, Geist_Mono } from 'next/font/google';
+import { VivyFab } from './vivy-fab';
+import { MobileTabs } from './mobile-tabs';
+import { NotificationsBell } from './notifications-bell';
+import './globals.css';
 
 // Her voice — a soft, warm serif. UI stays in a quiet sans; numbers in mono.
 const fraunces = Fraunces({
-  variable: "--font-fraunces",
-  subsets: ["latin"],
-  style: ["normal", "italic"],
+  variable: '--font-fraunces',
+  subsets: ['latin'],
+  style: ['normal', 'italic'],
 });
 
 const instrument = Instrument_Sans({
-  variable: "--font-instrument",
-  subsets: ["latin"],
+  variable: '--font-instrument',
+  subsets: ['latin'],
 });
 
 const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+  variable: '--font-geist-mono',
+  subsets: ['latin'],
 });
 
 export const metadata: Metadata = {
-  title: "Vivy",
-  description: "My personal AI assistant",
-  appleWebApp: { capable: true, title: "Vivy", statusBarStyle: "black-translucent" },
+  title: 'Vivy',
+  description: 'My personal AI assistant',
+  appleWebApp: { capable: true, title: 'Vivy', statusBarStyle: 'black-translucent' },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#141218",
+  themeColor: '#141218',
 };
 
 const nav = [
-  { href: "/chat", label: "Chat" },
-  { href: "/tasks", label: "Tasks" },
-  { href: "/learning", label: "Learning" },
-  { href: "/finance", label: "Finance" },
-  { href: "/browsing", label: "Browsing" },
+  { href: '/chat', label: 'Chat' },
+  { href: '/tasks', label: 'Tasks' },
+  { href: '/learning', label: 'Learning' },
+  { href: '/finance', label: 'Finance' },
+  { href: '/browsing', label: 'Browsing' },
 ];
 
 export default function RootLayout({
@@ -61,23 +62,28 @@ export default function RootLayout({
             </Link>
             <div className="hidden gap-5 pt-0.5 sm:flex">
               {nav.map((n) => (
-                <Link
-                  key={n.href}
-                  href={n.href}
-                  className="text-moth transition-colors hover:text-linen"
-                >
+                <Link key={n.href} href={n.href} className="text-moth transition-colors hover:text-linen">
                   {n.label}
                 </Link>
               ))}
             </div>
-            <Link
-              href="/settings"
-              title="Settings"
-              className="ml-auto text-moth transition-colors hover:text-linen"
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" className="h-4.5 w-4.5" aria-hidden>
+            <span className="ml-auto flex items-center gap-4">
+              <NotificationsBell />
+            </span>
+            <Link href="/settings" title="Settings" className="text-moth transition-colors hover:text-linen">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                className="h-4.5 w-4.5"
+                aria-hidden
+              >
                 <circle cx="12" cy="12" r="3" />
-                <path d="M12 3.5v2m0 13v2m8.5-8.5h-2m-13 0h-2m14.6-6.1-1.4 1.4M6.3 17.7l-1.4 1.4m14.2 0-1.4-1.4M6.3 6.3 4.9 4.9" strokeLinecap="round" />
+                <path
+                  d="M12 3.5v2m0 13v2m8.5-8.5h-2m-13 0h-2m14.6-6.1-1.4 1.4M6.3 17.7l-1.4 1.4m14.2 0-1.4-1.4M6.3 6.3 4.9 4.9"
+                  strokeLinecap="round"
+                />
               </svg>
             </Link>
           </nav>
