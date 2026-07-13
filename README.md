@@ -29,6 +29,22 @@ Claude via AI SDK · Vercel Cron for the proactive jobs.
 screen-time sample — is *an event flowing into one timeline*. Adding a capability means
 adding an ingestor or an AI job, never a second app.
 
+## Repo layout (npm workspaces — ADR-0002)
+
+```
+apps/web           Next.js app: UI + Core API + AI jobs (deploys via Vercel, root dir = apps/web)
+apps/extension     Chrome extension — browsing/watch ingestor
+apps/desktop       (placeholder) thin shell around web + OS activity tracker — Epic 6
+apps/android       (placeholder) thin shell around web + UsageStats/FCM/SMS — Epic 6
+services/analysis  (placeholder) heavy AI backend; language TBD (Python vs Rust, open ADR)
+docs               tracker · specs · journal · decisions · bugs — the source of truth
+```
+
+`npm run dev` at the root runs the web app. Pushing a `v*` tag builds every app that
+exists into a GitHub Release (`.github/workflows/release.yml`); the web app ships from
+Vercel on every push to main. Desktop and Android are wrappers around `apps/web` —
+the web app is the single UI source; shells only add what a browser can't do.
+
 ## Roadmap (see `docs/TRACKER.md` for the live map)
 
 1. **Spine + task pipeline** — Event API, DB, tasks/notes, daily "do this today" brief, chat.

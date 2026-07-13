@@ -211,8 +211,12 @@ The UI was built mobile-first; desktop used to get a stretched phone layout.
 - [ ] [ ] Push notifications: daily brief + nudges land on the phone
 - [ ] [ ] (later, ties into Epic 3) SMS listener → bank-transaction events
 
+### Repo structure & DX (pulled forward 2026-07-13)
+- [x] [x] npm-workspaces monorepo [[ADR-0002]]: apps/web (Next app moved wholesale, git history kept), apps/extension, placeholder apps/desktop + apps/android + services/analysis with intent READMEs; backend language (Python vs Rust) deliberately open — verified: install/tsc/dev server/authed pages all green from new layout
+- [ ] [ ] USER: Vercel dashboard → Settings → Build & Deployment → Root Directory = `apps/web` (required before next deploy)
+
 ### CI/CD & releases
-- [ ] [ ] GitHub Actions: push a `v*` tag → build desktop binaries + Android APK → attach to a GitHub Release
+- [x] [ ] GitHub Actions release workflow: `v*` tag → detect job → build every app that exists (extension zips today; desktop/android jobs auto-activate when their folders become real projects) → GitHub Release with generated notes — YAML-validated; first real run = first tag push
 - [ ] [ ] In-app update notification: apps check the latest release version and nudge to update
 - [ ] [ ] App version surfaced in /settings; release notes generated from commits since last tag
 - [ ] [ ] (web already ships via Vercel on every push — unchanged)

@@ -49,6 +49,10 @@ per tracker line. Only the person who *ran the test* flips a tracker item's test
 - Stack: Next.js (App Router) + TypeScript on Vercel · Neon Postgres (Drizzle ORM) ·
   Claude API via AI SDK (AI Gateway) · future ingestors (browser extension, screen-time
   agent, audio recorder → Whisper) are thin clients that POST events to the Core API.
+- Layout: npm-workspaces monorepo (ADR-0002). The Next app lives in **`apps/web`** (run
+  dev/build/drizzle from there; `.env.local` is there too). `apps/extension` is the
+  Chrome extension; `apps/desktop`, `apps/android`, `services/analysis` are reserved
+  slots — read their READMEs before building into them. Tag `v*` → release workflow.
 - Architecture rule: **everything is an event into one timeline.** New capabilities are new
   ingestors or new AI jobs over the same store — never a separate app with its own database.
 - Automation rule: **no manual data entry.** Every data source must have an automatic

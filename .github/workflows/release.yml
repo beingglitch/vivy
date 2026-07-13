@@ -1,0 +1,99 @@
+# Tag-triggered releases: push a v* tag → build every app that exists → one
+# GitHub Release with the artifacts + generated notes. Apps check the latest
+# release to show their "update available" nudge (Epic 6).
+#
+# The web app is NOT built here — Vercel deploys it on every push to main.
+# Desktop/android jobs switch on automatically the moment those folders get a
+# real project (detect job), so this pipeline is ready before the apps are.
+
+name: release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    outputs:
+      desktop: ${{ steps.check.outputs.desktop }}
+      android: ${{ steps.check.outputs.android }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: check
+        run: |
+          [ -f apps/desktop/package.json ] && echo "desktop=true" >> "$GITHUB_OUTPUT" || echo "desktop=false" >> "$GITHUB_OUTPUT"
+          { [ -f apps/android/gradlew ] || [ -f apps/android/package.json ]; } && echo "android=true" >> "$GITHUB_OUTPUT" || echo "android=false" >> "$GITHUB_OUTPUT"
+
+  extension:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Zip the Chrome extension
+        run: |
+          cd apps/extension
+          zip -r "../../vivy-extension-${GITHUB_REF_NAME}.zip" .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: extension
+          path: vivy-extension-*.zip
+
+  # Shape only — finalize the steps when the desktop ADR (Tauri vs Electron)
+  # is decided. The job stays skipped until apps/desktop/package.json exists.
+  desktop:
+    needs: detect
+    if: needs.detect.outputs.desktop == 'true'
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci
+      - run: npm run build -w desktop
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.os }}
+          path: apps/desktop/dist/**
+
+  # Shape only — finalize when the android ADR (Kotlin vs Capacitor) is decided.
+  android:
+    needs: detect
+    if: needs.detect.outputs.android == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Build APK
+        run: |
+          cd apps/android
+          ./gradlew assembleRelease
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android
+          path: apps/android/app/build/outputs/apk/release/*.apk
+
+  release:
+    needs: [detect, extension, desktop, android]
+    # run once everything that applies has finished; skipped jobs are fine,
+    # failed builds are not
+    if: ${{ !cancelled() && needs.extension.result == 'success' && needs.desktop.result != 'failure' && needs.android.result != 'failure' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: artifacts/**
