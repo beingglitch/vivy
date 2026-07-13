@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { desc, gte } from 'drizzle-orm';
 import { db, transactions } from '@/lib/db';
+import { intParam } from '@/lib/query';
 
 export async function GET(req: NextRequest) {
-  const days = Math.min(Number(req.nextUrl.searchParams.get('days') ?? 31), 365);
+  const days = intParam(req.nextUrl.searchParams.get('days'), { fallback: 31, max: 365 });
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
   const rows = await db
     .select()
