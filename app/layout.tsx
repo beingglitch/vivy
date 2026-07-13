@@ -55,7 +55,7 @@ export default function RootLayout({
         <header className="border-b border-seam/70">
           {/* Phones navigate with the bottom tab bar; the top row keeps just the
               wordmark and settings. Full link row appears from sm up. */}
-          <nav className="mx-auto flex max-w-4xl items-center gap-5 px-4 py-3 text-sm sm:gap-6">
+          <nav className="mx-auto flex max-w-4xl items-center gap-5 px-4 py-3 text-sm sm:gap-6 lg:max-w-6xl">
             <Link href="/" className="flex items-center gap-2">
               <span className="presence h-2 w-2 rounded-full bg-ember" aria-hidden />
               <span className="font-voice text-lg italic tracking-wide text-linen">Vivy</span>
@@ -88,7 +88,10 @@ export default function RootLayout({
             </Link>
           </nav>
         </header>
-        <div className="mx-auto w-full max-w-4xl flex-1 px-4 py-8 pb-36 sm:pb-24">{children}</div>
+        {/* Phones read a single column; large screens get a real desktop canvas. */}
+        <div className="mx-auto w-full max-w-4xl flex-1 px-4 py-8 pb-36 sm:pb-24 lg:max-w-6xl lg:px-6">
+          {children}
+        </div>
         <VivyFab />
         <MobileTabs />
       </body>

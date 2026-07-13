@@ -275,7 +275,9 @@ export default async function Dashboard() {
   return (
     <main className="space-y-8">
       <section>
-        <p className="font-voice text-2xl italic text-linen">{greeting(firstName || undefined)}</p>
+        <p className="font-voice text-2xl italic text-linen lg:text-3xl">
+          {greeting(firstName || undefined)}
+        </p>
         <h1 className="mt-1 text-sm text-moth">
           {new Date().toLocaleDateString('en-IN', {
             weekday: 'long',
@@ -290,13 +292,13 @@ export default async function Dashboard() {
           clock is already spent. The pairing IS the message. */}
       <Link
         href="/finance"
-        className="block rounded-xl border border-seam bg-veil/50 px-4 py-6 text-center transition-colors hover:border-ember/40"
+        className="block rounded-xl border border-seam bg-veil/50 px-4 py-6 text-center transition-colors hover:border-ember/40 lg:py-8"
       >
-        <div className="flex items-end justify-center gap-5 sm:gap-8">
+        <div className="flex items-end justify-center gap-5 sm:gap-8 lg:gap-12">
           <div>
             <p className="text-xs font-medium tracking-widest text-moth uppercase">Net worth</p>
             <p
-              className={`mt-1.5 font-mono text-3xl tracking-tight sm:text-5xl ${netWorth >= 0 ? 'text-sage' : 'text-rose'}`}
+              className={`mt-1.5 font-mono text-3xl tracking-tight sm:text-5xl lg:text-6xl ${netWorth >= 0 ? 'text-sage' : 'text-rose'}`}
             >
               {netWorth < 0 ? '−' : ''}
               {fmtINR(Math.abs(netWorth))}
@@ -304,10 +306,10 @@ export default async function Dashboard() {
           </div>
           {profile.dob && (
             <>
-              <div className="h-12 w-px bg-seam sm:h-14" aria-hidden />
+              <div className="h-12 w-px bg-seam sm:h-14 lg:h-16" aria-hidden />
               <AgeDisplay
                 dob={profile.dob}
-                numberClass="mt-1.5 font-mono text-3xl tracking-tight text-linen sm:text-5xl"
+                numberClass="mt-1.5 font-mono text-3xl tracking-tight text-linen sm:text-5xl lg:text-6xl"
               />
             </>
           )}
@@ -318,98 +320,106 @@ export default async function Dashboard() {
         </p>
       </Link>
 
-      <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {tiles.map((t) => (
-          <div key={t.label} className="rounded-xl border border-seam bg-veil/50 px-4 py-3">
-            <p className="font-mono text-xl text-linen">{t.value}</p>
-            <p className="mt-0.5 text-xs text-moth">{t.label}</p>
-            <p className="mt-1 font-mono text-[10px] text-moth/70">{t.month}</p>
-          </div>
-        ))}
-      </section>
+      {/* Desktop is a command room: instruments left, "today at a glance" rail
+          right (sticky). Phones keep the original single-column order via order-*. */}
+      <div className="flex flex-col gap-8 lg:grid lg:grid-cols-12 lg:items-start lg:gap-5">
+        <div className="order-1 space-y-4 lg:sticky lg:top-6 lg:order-2 lg:col-span-4">
+          <section className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-2">
+            {tiles.map((t) => (
+              <div key={t.label} className="rounded-xl border border-seam bg-veil/50 px-4 py-3">
+                <p className="font-mono text-xl text-linen">{t.value}</p>
+                <p className="mt-0.5 text-xs text-moth">{t.label}</p>
+                <p className="mt-1 font-mono text-[10px] text-moth/70">{t.month}</p>
+              </div>
+            ))}
+          </section>
 
-      {brief && (
-        <details className="rounded-xl border border-seam bg-veil open:bg-veil">
-          <summary className="cursor-pointer px-5 py-3 text-xs font-medium tracking-widest text-ember uppercase">
-            Today&apos;s brief · {brief.day}
-          </summary>
-          <div className="border-l-2 border-ember mx-5 mb-4 px-4">
-            <pre className="font-voice whitespace-pre-wrap text-[15px] leading-7 text-linen/95">
-              {brief.content}
-            </pre>
-          </div>
-        </details>
-      )}
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        <ChartCard title="Screen time" subtitle="browsing" href="/browsing">
-          <Bars days={screenDays} color="ember" fmt={(v) => fmtDuration(v)} />
-        </ChartCard>
-        <ChartCard title="Tasks completed" subtitle="tasks" href="/tasks">
-          <Bars days={taskDays} color="sage" fmt={(v) => `${v} done`} />
-        </ChartCard>
-        <ChartCard title="Chapters & lessons" subtitle="learning" href="/learning">
-          <Bars days={readDays} color="sage" fmt={(v) => `${v} units`} />
-        </ChartCard>
-        <ChartCard title="Daily spend" subtitle="finance" href="/finance">
-          <Bars days={spendDays} color="ember" fmt={(v) => fmtINR(v)} />
-        </ChartCard>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        <ChartCard title="Where today went" subtitle="browsing" href="/browsing">
-          {todayStats.domains.length === 0 ? (
-            <p className="text-sm text-moth">Nothing tracked yet today.</p>
-          ) : (
-            <ul className="space-y-2.5">
-              {todayStats.domains.slice(0, 5).map((d) => (
-                <li key={d.domain} className="flex items-center gap-3 text-sm">
-                  <span className="w-28 shrink-0 truncate text-moth">{d.domain}</span>
-                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-seam/60">
-                    <div
-                      className="h-full rounded-r-full bg-ember/80"
-                      style={{
-                        width: `${Math.max((d.seconds / maxDomain) * 100, 2)}%`,
-                      }}
-                    />
-                  </div>
-                  <span className="w-14 shrink-0 text-right font-mono text-xs text-linen/90">
-                    {fmtDuration(d.seconds)}
-                  </span>
-                </li>
-              ))}
-            </ul>
+          {brief && (
+            <details className="rounded-xl border border-seam bg-veil open:bg-veil">
+              <summary className="cursor-pointer px-5 py-3 text-xs font-medium tracking-widest text-ember uppercase">
+                Today&apos;s brief · {brief.day}
+              </summary>
+              <div className="border-l-2 border-ember mx-5 mb-4 px-4 lg:max-h-[26rem] lg:overflow-y-auto">
+                <pre className="font-voice whitespace-pre-wrap text-[15px] leading-7 text-linen/95">
+                  {brief.content}
+                </pre>
+              </div>
+            </details>
           )}
-        </ChartCard>
-        <ChartCard title="In progress" subtitle="learning" href="/learning">
-          {activeLearning.length === 0 ? (
-            <p className="text-sm text-moth">Nothing active. Pick something up.</p>
-          ) : (
-            <ul className="space-y-2.5">
-              {activeLearning.map((l) => {
-                const pct = l.unitsTotal
-                  ? Math.min(100, Math.round((l.unitsDone / l.unitsTotal) * 100))
-                  : null;
-                return (
-                  <li key={l.id} className="flex items-center gap-3 text-sm">
-                    <span className="w-28 shrink-0 truncate text-moth">{l.title}</span>
-                    <div className="h-2 flex-1 overflow-hidden rounded-full bg-seam/60">
-                      <div
-                        className="h-full rounded-r-full bg-sage"
-                        style={{
-                          width: `${pct === null ? 2 : Math.max(pct, 2)}%`,
-                        }}
-                      />
-                    </div>
-                    <span className="w-14 shrink-0 text-right font-mono text-xs text-linen/90">
-                      {pct === null ? `${l.unitsDone}` : `${pct}%`}
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </ChartCard>
+        </div>
+
+        <div className="order-2 space-y-4 lg:order-1 lg:col-span-8">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <ChartCard title="Screen time" subtitle="browsing" href="/browsing">
+              <Bars days={screenDays} color="ember" fmt={(v) => fmtDuration(v)} />
+            </ChartCard>
+            <ChartCard title="Tasks completed" subtitle="tasks" href="/tasks">
+              <Bars days={taskDays} color="sage" fmt={(v) => `${v} done`} />
+            </ChartCard>
+            <ChartCard title="Chapters & lessons" subtitle="learning" href="/learning">
+              <Bars days={readDays} color="sage" fmt={(v) => `${v} units`} />
+            </ChartCard>
+            <ChartCard title="Daily spend" subtitle="finance" href="/finance">
+              <Bars days={spendDays} color="ember" fmt={(v) => fmtINR(v)} />
+            </ChartCard>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <ChartCard title="Where today went" subtitle="browsing" href="/browsing">
+              {todayStats.domains.length === 0 ? (
+                <p className="text-sm text-moth">Nothing tracked yet today.</p>
+              ) : (
+                <ul className="space-y-2.5">
+                  {todayStats.domains.slice(0, 5).map((d) => (
+                    <li key={d.domain} className="flex items-center gap-3 text-sm">
+                      <span className="w-28 shrink-0 truncate text-moth">{d.domain}</span>
+                      <div className="h-2 flex-1 overflow-hidden rounded-full bg-seam/60">
+                        <div
+                          className="h-full rounded-r-full bg-ember/80"
+                          style={{
+                            width: `${Math.max((d.seconds / maxDomain) * 100, 2)}%`,
+                          }}
+                        />
+                      </div>
+                      <span className="w-14 shrink-0 text-right font-mono text-xs text-linen/90">
+                        {fmtDuration(d.seconds)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </ChartCard>
+            <ChartCard title="In progress" subtitle="learning" href="/learning">
+              {activeLearning.length === 0 ? (
+                <p className="text-sm text-moth">Nothing active. Pick something up.</p>
+              ) : (
+                <ul className="space-y-2.5">
+                  {activeLearning.map((l) => {
+                    const pct = l.unitsTotal
+                      ? Math.min(100, Math.round((l.unitsDone / l.unitsTotal) * 100))
+                      : null;
+                    return (
+                      <li key={l.id} className="flex items-center gap-3 text-sm">
+                        <span className="w-28 shrink-0 truncate text-moth">{l.title}</span>
+                        <div className="h-2 flex-1 overflow-hidden rounded-full bg-seam/60">
+                          <div
+                            className="h-full rounded-r-full bg-sage"
+                            style={{
+                              width: `${pct === null ? 2 : Math.max(pct, 2)}%`,
+                            }}
+                          />
+                        </div>
+                        <span className="w-14 shrink-0 text-right font-mono text-xs text-linen/90">
+                          {pct === null ? `${l.unitsDone}` : `${pct}%`}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </ChartCard>
+          </div>
+        </div>
       </div>
     </main>
   );

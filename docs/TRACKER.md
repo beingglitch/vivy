@@ -195,8 +195,9 @@ track activity at OS level, not just in the browser, and (b) carry Vivy everywhe
 Needs a spec before building (stack choice desktop shell / Android approach = ADRs).
 
 ### Desktop-fit web UI
-The UI was built mobile-first; desktop currently gets a stretched phone layout.
-- [ ] [ ] Desktop audit: widen content, multi-column dashboard (tiles + brief side by side), tasks/finance two-pane
+The UI was built mobile-first; desktop used to get a stretched phone layout.
+- [x] [x] First pass (2026-07-13): shell widens to 6xl on lg; home = hero thesis + instruments left (2×2 charts + activity lists) with sticky "today" rail right (tiles + brief); tasks = two-pane (capture+Today pinned left, areas/inbox/archive right) — mobile order untouched via lg:-only classes; headless-Chrome screenshot-verified at 1440px (home/tasks/finance)
+- [ ] [ ] Second pass: finance/learning/browsing desktop compositions; brief open-by-default on desktop
 - [ ] [ ] Keyboard-first quick capture (global "add task/expense" command palette)
 
 ### Desktop app (shell + OS-level tracker)
