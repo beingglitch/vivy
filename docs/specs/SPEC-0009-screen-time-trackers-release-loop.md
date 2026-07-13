@@ -31,7 +31,9 @@ the web app's /settings shows "latest version + download".
       Release with generated notes.
 - [x] Web update surface: /api/releases (public GitHub API, 5-min cache) + "Apps &
       updates" card on /settings with per-asset download buttons.
-- [ ] Tag v0.1.0 pushed; workflow green; release visible; card shows the three assets.
+- [x] Tag v0.1.0 pushed; workflow green (first run!); release live with all three assets
+      (extension zip 4.9KB · linux-agent tarball 2KB · APK 2.2MB); /api/releases serves
+      it, so the /settings card shows the downloads. Verified 2026-07-13.
 
 ## Out of scope
 
@@ -49,8 +51,8 @@ the web app's /settings shows "latest version + download".
       MainActivity + UsageWorker; local assembleDebug green.
 - [x] Workflow: desktop-agent tarball job; android job → assembleDebug, renamed APK.
 - [x] /api/releases + AppsCard on /settings.
-- [ ] Tag v0.1.0, verify workflow + release + card end-to-end.
-- [ ] Journal + tracker.
+- [x] Tag v0.1.0, verify workflow + release + card end-to-end.
+- [x] Journal + tracker.
 
 ## Notes
 

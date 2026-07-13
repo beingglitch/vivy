@@ -218,8 +218,8 @@ The UI was built mobile-first; desktop used to get a stretched phone layout.
 - [ ] [ ] USER: Vercel dashboard → Settings → Build & Deployment → Root Directory = `apps/web` (required before next deploy)
 
 ### CI/CD & releases [[SPEC-0009]]
-- [x] [ ] GitHub Actions release workflow: `v*` tag → extension zip + linux-agent tarball + debug APK → GitHub Release with generated notes — YAML-validated; first real run = v0.1.0 tag
-- [x] [ ] Update surface on the web app: /api/releases (public GitHub API, 5-min cache) + "Apps & updates" card on /settings with download buttons — renders locally; shows assets once a release exists
+- [x] [x] GitHub Actions release workflow: `v*` tag → extension zip + linux-agent tarball + debug APK → GitHub Release with generated notes — v0.1.0 built green on first run, all 3 assets attached (2026-07-13)
+- [x] [x] Update surface on the web app: /api/releases (public GitHub API, 5-min cache) + "Apps & updates" card on /settings with download buttons — verified serving the live v0.1.0 assets (2026-07-13)
 - [ ] [ ] In-app self-update on Android (check latest tag, prompt install) — the /settings card is the update channel until then
 - [ ] [ ] (web already ships via Vercel on every push — unchanged)
 
