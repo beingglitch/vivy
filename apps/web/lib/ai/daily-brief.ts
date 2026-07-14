@@ -4,6 +4,7 @@ import { db, briefs, events, learning, projects, routines, tasks, transactions }
 import { browsingStats, fmtDuration } from '@/lib/browsing';
 import { istToday, dayOfWeek, weekMonday } from '@/lib/routines';
 import { goalsContext } from '@/lib/goals';
+import { healthContext } from '@/lib/health';
 import { VIVY_MODEL, VIVY_PERSONA, memoryContext } from './index';
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -215,28 +216,40 @@ export async function generateDailyBrief(): Promise<{ day: string; content: stri
 
   // dynamic: planner statically imports structureContext from this file
   const { todaysPlanContext } = await import('./planner');
-  const [open, doneYesterday, stats, memory, trend, learn, spend, structure, goalLines, planBlock] =
-    await Promise.all([
-      db
-        .select()
-        .from(tasks)
-        .where(inArray(tasks.status, ['inbox', 'today', 'doing']))
-        .orderBy(tasks.priority, desc(tasks.createdAt))
-        .limit(60),
-      db
-        .select()
-        .from(tasks)
-        .where(and(inArray(tasks.status, ['done']), gte(tasks.completedAt, yesterday)))
-        .limit(30),
-      browsingStats(yesterday),
-      memoryContext(),
-      weeklyTrend(),
-      learningContext(),
-      spendContext(),
-      structureContext(),
-      goalsContext(),
-      todaysPlanContext(),
-    ]);
+  const [
+    open,
+    doneYesterday,
+    stats,
+    memory,
+    trend,
+    learn,
+    spend,
+    structure,
+    goalLines,
+    planBlock,
+    healthLines,
+  ] = await Promise.all([
+    db
+      .select()
+      .from(tasks)
+      .where(inArray(tasks.status, ['inbox', 'today', 'doing']))
+      .orderBy(tasks.priority, desc(tasks.createdAt))
+      .limit(60),
+    db
+      .select()
+      .from(tasks)
+      .where(and(inArray(tasks.status, ['done']), gte(tasks.completedAt, yesterday)))
+      .limit(30),
+    browsingStats(yesterday),
+    memoryContext(),
+    weeklyTrend(),
+    learningContext(),
+    spendContext(),
+    structureContext(),
+    goalsContext(),
+    todaysPlanContext(),
+    healthContext(),
+  ]);
 
   const context = [
     `Today: ${day}`,
@@ -261,6 +274,7 @@ export async function generateDailyBrief(): Promise<{ day: string; content: stri
     structure,
     goalLines,
     planBlock,
+    healthLines,
   ]
     .filter(Boolean)
     .join('\n');

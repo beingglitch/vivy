@@ -12,6 +12,7 @@ import {
   transactions,
 } from '@/lib/db';
 import { istToday, dayOfWeek, weekMonday } from '@/lib/routines';
+import { healthContext } from '@/lib/health';
 import { VIVY_MODEL_FAST, VIVY_PERSONA } from '@/lib/ai';
 import { fmtINR } from '@/lib/finance';
 
@@ -228,6 +229,7 @@ export async function eveningReview() {
       ? `Stalled learning: ${stalled.map((s) => `${s.title} (${s.days === null ? 'never logged' : `${s.days} days quiet`})`).join('; ')}.`
       : '',
     `Spent today (non-bill): ${fmtINR(Number(spendRow.total))}.`,
+    await healthContext(),
   ]
     .filter(Boolean)
     .join('\n');

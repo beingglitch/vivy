@@ -5,6 +5,7 @@ import { db, chatMessages, events, learning, memories, tasks, transactions } fro
 import { VIVY_MODEL, VIVY_PERSONA, memoryContext } from '@/lib/ai';
 import { logLearningProgress } from '@/lib/learning';
 import { TX_CATEGORIES } from '@/lib/finance';
+import { logMeal, logSleep, MEALS } from '@/lib/health';
 
 export const maxDuration = 120;
 
@@ -16,11 +17,7 @@ const vivyTools = {
       const rows = await db
         .select()
         .from(tasks)
-        .where(
-          status
-            ? eq(tasks.status, status)
-            : inArray(tasks.status, ['inbox', 'today', 'doing']),
-        )
+        .where(status ? eq(tasks.status, status) : inArray(tasks.status, ['inbox', 'today', 'doing']))
         .orderBy(tasks.priority, desc(tasks.createdAt))
         .limit(50);
       return rows.map((t) => ({
@@ -117,7 +114,8 @@ const vivyTools = {
         .from(learning)
         .where(and(ilike(learning.title, `%${titleContains}%`), ne(learning.status, 'dropped')))
         .limit(3);
-      if (matches.length === 0) return { error: `no book/course matching "${titleContains}" — offer to add it` };
+      if (matches.length === 0)
+        return { error: `no book/course matching "${titleContains}" — offer to add it` };
       if (matches.length > 1) return { error: 'ambiguous', candidates: matches.map((m) => m.title) };
       const item = await logLearningProgress(matches[0].id, units, note, 'chat');
       return {
@@ -146,9 +144,23 @@ const vivyTools = {
     },
   }),
 
+  logMeal: tool({
+    description: 'Log a meal I ate, e.g. "I had lunch", "ate breakfast". Health event on the timeline.',
+    inputSchema: z.object({
+      meal: z.enum(MEALS),
+      note: z.string().nullable().describe('what was eaten, if said'),
+    }),
+    execute: async ({ meal, note }) => logMeal(meal, 'chat', note ?? undefined),
+  }),
+
+  logSleep: tool({
+    description: 'Log "going to sleep" or "just woke up". Sleep duration is computed from the pair.',
+    inputSchema: z.object({ kind: z.enum(['sleep', 'wake']) }),
+    execute: async ({ kind }) => logSleep(kind, 'chat'),
+  }),
+
   logExpense: tool({
-    description:
-      'Record money spent (or received), e.g. "spent 250 on lunch". Amount in INR.',
+    description: 'Record money spent (or received), e.g. "spent 250 on lunch". Amount in INR.',
     inputSchema: z.object({
       amount: z.number().positive(),
       category: z.enum(TX_CATEGORIES),
@@ -191,7 +203,11 @@ const vivyTools = {
       const rows = await db
         .select()
         .from(learning)
-        .where(kind ? and(eq(learning.kind, kind), ne(learning.status, 'dropped')) : ne(learning.status, 'dropped'))
+        .where(
+          kind
+            ? and(eq(learning.kind, kind), ne(learning.status, 'dropped'))
+            : ne(learning.status, 'dropped'),
+        )
         .orderBy(desc(learning.createdAt))
         .limit(50);
       return rows.map((r) => ({
@@ -278,10 +294,6 @@ export async function POST(req: Request) {
 
 // Chat history for the UI (last 100 messages, oldest first).
 export async function GET() {
-  const rows = await db
-    .select()
-    .from(chatMessages)
-    .orderBy(desc(chatMessages.createdAt))
-    .limit(100);
+  const rows = await db.select().from(chatMessages).orderBy(desc(chatMessages.createdAt)).limit(100);
   return Response.json({ messages: rows.reverse() });
 }

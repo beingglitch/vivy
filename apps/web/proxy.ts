@@ -3,7 +3,7 @@ import { verifySessionValue, SESSION_COOKIE } from './lib/auth';
 
 // Everything is private. Exceptions:
 //  - /login + /api/login: how you get in
-//  - /api/events: ingestors authenticate with the API key inside the route
+//  - /api/events, /api/voice-log: ingestors/devices authenticate with the API key inside the route
 //  - /api/cron/*: Vercel Cron authenticates with CRON_SECRET inside the route
 //  - /api/mcp/*: claude.ai connector authenticates with the secret path segment inside the route
 export default async function proxy(req: NextRequest) {
@@ -13,6 +13,7 @@ export default async function proxy(req: NextRequest) {
     pathname === '/login' ||
     pathname === '/api/login' ||
     pathname.startsWith('/api/events') ||
+    pathname === '/api/voice-log' ||
     pathname.startsWith('/api/cron') ||
     pathname.startsWith('/api/mcp')
   ) {

@@ -182,7 +182,13 @@ One `learning` concept (kind: book|course), unit-based progress, coached in the 
 - [x] [x] Goals: table + /goals page + home pace card; progress auto-computed from the timeline (networth / books-finished / learning-units-week metrics), pace math ("behind; needs +₹44k/month") — verified locally 2026-07-14
 - [x] [x] Nightly planner: /plan — intent → Claude time-blocks tomorrow around calendar + routines + deadlines + goal pace; plan feeds next morning's brief; evening nudge links to /plan — generation verified locally 2026-07-14
 - [x] [ ] Google Calendar OAuth (read + write `[vivy]` blocks): flow + token store + live-query + create/replace built — **needs user's GOOGLE_CLIENT_ID/SECRET, then connect + live verify**
-- [ ] [ ] Health goal metrics (sleep/meals) — unlocked by SPEC-0011 capture events
+- [ ] [ ] Health goal metrics (sleep/meals) — capture events exist (SPEC-0011); metric registry entries still to add
+
+### Health & voice capture [[SPEC-0011]]
+- [x] [x] meal.logged / sleep.start / sleep.wake events + lib/health (healthToday, healthContext into brief + evening review) — voice-log endpoint verified 2026-07-14 ("I just had lunch" → meal.logged{lunch}; 401 without auth)
+- [x] [x] /api/voice-log: free text → Haiku classify → right event (keyword fallback); session or x-vivy-key auth
+- [x] [ ] Capture surfaces: chat tools logMeal/logSleep (spoken round-trip untried), MCP log_meal/log_sleep (Claude app voice mode), Android quick-settings tile → speech dialog → voice-log — APK builds; **user: install new APK + add tile**
+- [ ] [ ] Sleep inference from phone.usage overnight gap (the true no-manual-entry path — needs a few days of phone data)
 
 ### Deeper memory
 - [ ] [ ] Long-term memory store with retrieval (facts, preferences, people, decisions)

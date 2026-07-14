@@ -14,6 +14,7 @@ import {
 } from '@/lib/db';
 import { TX_CATEGORIES, INCOME_CATEGORIES, fmtINR } from '@/lib/finance';
 import { istToday, weekMonday } from '@/lib/routines';
+import { logMeal, logSleep, MEALS, type Meal } from '@/lib/health';
 
 // MCP server (Streamable HTTP, stateless) so claude.ai can connect to Vivy as
 // a custom connector. No OAuth: the connector UI can't send custom headers, so
@@ -108,6 +109,30 @@ const TOOLS = [
     inputSchema: {
       type: 'object',
       properties: { name: { type: 'string', description: 'routine name (fuzzy match ok)' } },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'log_meal',
+    description: 'Log a meal Suraj ate ("I had lunch", "ate breakfast"). Health event on his timeline.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        meal: { type: 'string', enum: ['breakfast', 'lunch', 'dinner', 'snack'] },
+        note: { type: 'string', description: 'what was eaten, if said' },
+      },
+      required: ['meal'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'log_sleep',
+    description:
+      'Log that Suraj is going to sleep now, or just woke up. Sleep duration is computed from the pair.',
+    inputSchema: {
+      type: 'object',
+      properties: { kind: { type: 'string', enum: ['sleep', 'wake'] } },
+      required: ['kind'],
       additionalProperties: false,
     },
   },
@@ -319,6 +344,21 @@ async function runTool(name: string, args: Json): Promise<string> {
       });
       const count = doneDays(hit.id).length + 1;
       return `Logged: ${hit.name} today ✓ (${hit.timesPerWeek ? `${count} of ${hit.timesPerWeek} this week` : `${count} this week`})`;
+    }
+    case 'log_meal': {
+      const meal = typeof args.meal === 'string' ? args.meal : '';
+      if (!(MEALS as readonly string[]).includes(meal)) {
+        throw new Error(`meal must be one of: ${MEALS.join(', ')}`);
+      }
+      const note = typeof args.note === 'string' && args.note.trim() ? args.note.trim() : undefined;
+      const logged = await logMeal(meal as Meal, 'mcp', note);
+      return `Logged: ${logged.meal} today ✓`;
+    }
+    case 'log_sleep': {
+      const kind = args.kind === 'sleep' || args.kind === 'wake' ? args.kind : null;
+      if (!kind) throw new Error('kind must be "sleep" or "wake"');
+      await logSleep(kind, 'mcp');
+      return kind === 'sleep' ? 'Good night — logged. ✓' : 'Good morning — wake logged. ✓';
     }
     case 'complete_task': {
       const id = typeof args.id === 'string' ? args.id : '';
