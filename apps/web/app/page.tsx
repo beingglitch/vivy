@@ -6,6 +6,7 @@ import { fmtINR, fmtINRShort } from '@/lib/finance';
 import { getProfile } from '@/lib/settings';
 import { AgeDisplay } from '@/app/age-display';
 import { BriefContent } from '@/app/brief-content';
+import { activeGoalsProgress } from '@/lib/goals';
 
 export const dynamic = 'force-dynamic';
 
@@ -136,6 +137,7 @@ export default async function Dashboard() {
     allPositions,
     profile,
     monthAgg,
+    goalPace,
   ] = await Promise.all([
     db
       .select({ ts: events.ts, type: events.type, payload: events.payload })
@@ -184,6 +186,7 @@ export default async function Dashboard() {
       })
       .from(events)
       .where(gte(events.ts, monthStart)),
+    activeGoalsProgress(),
   ]);
 
   const [monthSpendRow, monthDoneRow] = await Promise.all([
@@ -334,6 +337,43 @@ export default async function Dashboard() {
               </div>
             ))}
           </section>
+
+          {goalPace.length > 0 && (
+            <Link
+              href="/goals"
+              className="block rounded-xl border border-seam bg-veil p-4 transition-colors hover:border-hush"
+            >
+              <p className="text-xs font-medium tracking-widest text-moth uppercase">Goals</p>
+              <div className="mt-3 space-y-3">
+                {goalPace.slice(0, 3).map((p) => (
+                  <div key={p.goal.id}>
+                    <div className="flex items-baseline justify-between gap-2">
+                      <p className="truncate text-sm text-linen/90">{p.goal.title}</p>
+                      {p.onPace !== null && (
+                        <span className={`shrink-0 text-xs ${p.onPace ? 'text-sage' : 'text-rose'}`}>
+                          {p.onPace ? 'on pace' : 'behind'}
+                        </span>
+                      )}
+                    </div>
+                    {p.fraction !== null && (
+                      <div className="relative mt-1.5 h-1 overflow-hidden rounded-full bg-hush/40">
+                        <div
+                          className={`h-full rounded-full ${p.onPace === false ? 'bg-rose' : 'bg-sage'}`}
+                          style={{ width: `${Math.round(p.fraction * 100)}%` }}
+                        />
+                        {p.timeFraction !== null && (
+                          <div
+                            className="absolute top-0 h-full w-0.5 bg-linen/70"
+                            style={{ left: `${Math.round(p.timeFraction * 100)}%` }}
+                          />
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </Link>
+          )}
 
           {brief && (
             <details className="rounded-xl border border-seam bg-veil open:bg-veil">

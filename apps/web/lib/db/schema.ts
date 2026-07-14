@@ -240,3 +240,42 @@ export const chatMessages = pgTable('chat_messages', {
   content: text('content').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+// Top of the pyramid: goals → areas/projects → tasks/routines. Progress is NEVER
+// typed in — `metric` names a computed reading from the timeline (lib/goals).
+export const goals = pgTable('goals', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  title: text('title').notNull(),
+  kind: text('kind').notNull().default('custom'), // 'money' | 'reading' | 'health' | 'custom'
+  metric: text('metric'), // 'networth' | 'books_finished' | 'learning_minutes_week' | null (custom: no auto reading)
+  target: numeric('target', { precision: 14, scale: 2 }), // in the metric's unit (INR, books, minutes)
+  startValue: numeric('start_value', { precision: 14, scale: 2 }), // metric reading when the goal was set — pace baseline
+  deadline: date('deadline'),
+  status: text('status').notNull().default('active'), // 'active' | 'done' | 'dropped'
+  note: text('note'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Server-side OAuth grants (Google Calendar first). One row per provider.
+export const connections = pgTable('connections', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  provider: text('provider').notNull().unique(), // 'google'
+  refreshToken: text('refresh_token').notNull(),
+  accessToken: text('access_token'),
+  accessTokenExpiresAt: timestamp('access_token_expires_at', { withTimezone: true }),
+  scope: text('scope'),
+  accountEmail: text('account_email'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// One row per planned day (tomorrow-planning writes day = tomorrow). Replanning
+// overwrites; calendarEventIds lets us replace previously created [vivy] blocks.
+export const plans = pgTable('plans', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  day: date('day').notNull().unique(),
+  intent: text('intent'), // what Suraj said he wants for the day
+  content: text('content').notNull(), // markdown plan (Vivy-written)
+  blocks: jsonb('blocks').$type<{ start: string; end: string; title: string }[]>(), // structured time blocks
+  calendarEventIds: text('calendar_event_ids').array(), // gcal ids of [vivy] blocks we created
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});

@@ -123,7 +123,7 @@ One `learning` concept (kind: book|course), unit-based progress, coached in the 
 - *(the OS-level collectors — desktop agent + Android usage-stats app — moved to Epic 6, which owns the native shells they ship inside)*
 
 ### Life-account ingestors (email & calendar)
-- [ ] [ ] Google Calendar sync: meetings/events flow into the timeline + daily brief
+- [ ] [ ] Google Calendar sync: meetings/events flow into the timeline + daily brief *(OAuth + live read/write exists via SPEC-0010 planner; timeline ingestion of attended events still open)*
 - [ ] [ ] Gmail ingestor: bookings, deadlines, bills, action-needed mails → events → tasks
 
 **Bugs:** *(none open)*
@@ -177,6 +177,12 @@ One `learning` concept (kind: book|course), unit-based progress, coached in the 
 - [ ] [ ] Weekly review generated Sunday evening (wins, slips, next week's focus)
 - [ ] [ ] Real-time nudges (screen time, dues) beyond the three daily slots
 - [ ] [ ] Startup & job dashboards: goals, metrics I log, Vivy tracks progress
+
+### Goals & nightly planner [[SPEC-0010]]
+- [x] [x] Goals: table + /goals page + home pace card; progress auto-computed from the timeline (networth / books-finished / learning-units-week metrics), pace math ("behind; needs +₹44k/month") — verified locally 2026-07-14
+- [x] [x] Nightly planner: /plan — intent → Claude time-blocks tomorrow around calendar + routines + deadlines + goal pace; plan feeds next morning's brief; evening nudge links to /plan — generation verified locally 2026-07-14
+- [x] [ ] Google Calendar OAuth (read + write `[vivy]` blocks): flow + token store + live-query + create/replace built — **needs user's GOOGLE_CLIENT_ID/SECRET, then connect + live verify**
+- [ ] [ ] Health goal metrics (sleep/meals) — unlocked by SPEC-0011 capture events
 
 ### Deeper memory
 - [ ] [ ] Long-term memory store with retrieval (facts, preferences, people, decisions)

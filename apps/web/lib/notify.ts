@@ -233,15 +233,15 @@ export async function eveningReview() {
     .join('\n');
 
   const body = await vivyWords(
-    "This is my evening review. Lead with what I completed (celebrate if earned), name the ONE thing being avoided if any, and end by telling me to line up tomorrow's tasks now.",
+    'This is my evening review. Lead with what I completed (celebrate if earned), name the ONE thing being avoided if any, and end by telling me to open the planner and lay out tomorrow now.',
     facts,
-    `${done} task(s) done today. Take 2 minutes and line up tomorrow.`,
+    `${done} task(s) done today. Take 2 minutes and plan tomorrow.`,
   );
   return notify({
     kind: 'evening',
     title: 'Evening review',
     body,
-    url: '/tasks',
+    url: '/plan',
     dedupeKey: `evening:${today}`,
   });
 }

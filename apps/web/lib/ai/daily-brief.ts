@@ -3,13 +3,14 @@ import { and, desc, eq, gte, inArray, isNotNull, ne, sql } from 'drizzle-orm';
 import { db, briefs, events, learning, projects, routines, tasks, transactions } from '@/lib/db';
 import { browsingStats, fmtDuration } from '@/lib/browsing';
 import { istToday, dayOfWeek, weekMonday } from '@/lib/routines';
+import { goalsContext } from '@/lib/goals';
 import { VIVY_MODEL, VIVY_PERSONA, memoryContext } from './index';
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 // Routines due today (with weekly progress) + active areas/projects gone quiet —
 // the shape of the task world, so the brief can nag about silence, not just items.
-async function structureContext(): Promise<string> {
+export async function structureContext(): Promise<string> {
   const today = istToday();
   const monday = weekMonday(today);
   const dow = dayOfWeek(today);
@@ -212,25 +213,30 @@ export async function generateDailyBrief(): Promise<{ day: string; content: stri
   const yesterday = new Date(dayStart.getTime() - 24 * 60 * 60 * 1000);
   const day = new Date().toISOString().slice(0, 10);
 
-  const [open, doneYesterday, stats, memory, trend, learn, spend, structure] = await Promise.all([
-    db
-      .select()
-      .from(tasks)
-      .where(inArray(tasks.status, ['inbox', 'today', 'doing']))
-      .orderBy(tasks.priority, desc(tasks.createdAt))
-      .limit(60),
-    db
-      .select()
-      .from(tasks)
-      .where(and(inArray(tasks.status, ['done']), gte(tasks.completedAt, yesterday)))
-      .limit(30),
-    browsingStats(yesterday),
-    memoryContext(),
-    weeklyTrend(),
-    learningContext(),
-    spendContext(),
-    structureContext(),
-  ]);
+  // dynamic: planner statically imports structureContext from this file
+  const { todaysPlanContext } = await import('./planner');
+  const [open, doneYesterday, stats, memory, trend, learn, spend, structure, goalLines, planBlock] =
+    await Promise.all([
+      db
+        .select()
+        .from(tasks)
+        .where(inArray(tasks.status, ['inbox', 'today', 'doing']))
+        .orderBy(tasks.priority, desc(tasks.createdAt))
+        .limit(60),
+      db
+        .select()
+        .from(tasks)
+        .where(and(inArray(tasks.status, ['done']), gte(tasks.completedAt, yesterday)))
+        .limit(30),
+      browsingStats(yesterday),
+      memoryContext(),
+      weeklyTrend(),
+      learningContext(),
+      spendContext(),
+      structureContext(),
+      goalsContext(),
+      todaysPlanContext(),
+    ]);
 
   const context = [
     `Today: ${day}`,
@@ -253,6 +259,8 @@ export async function generateDailyBrief(): Promise<{ day: string; content: stri
     learn,
     spend,
     structure,
+    goalLines,
+    planBlock,
   ]
     .filter(Boolean)
     .join('\n');
@@ -266,8 +274,9 @@ export async function generateDailyBrief(): Promise<{ day: string; content: stri
       '**Also on the list** (the rest worth touching, compressed), ' +
       '**Note from Vivy** (your coach moment: ONE honest observation from the data — a streak to protect, ' +
       'a slowdown, a stalled book/course (days since last session), unusual spending, an overdue item I keep dodging, ' +
-      'a routine behind its weekly target, an area or project gone quiet for days — ' +
+      'a routine behind its weekly target, an area or project gone quiet for days, a goal off pace — ' +
       'with the numbers that prove it and one tiny concrete next step). ' +
+      "If last night's plan exists, structure Top 3 around it and call out any block already at risk. " +
       'If there are AI-proposed tasks awaiting approval, remind me to review them. ' +
       'Under 250 words. No preamble — start with the first section.' +
       memory,

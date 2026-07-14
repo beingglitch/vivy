@@ -36,6 +36,7 @@ export const viewport: Viewport = {
 const nav = [
   { href: '/chat', label: 'Chat' },
   { href: '/tasks', label: 'Tasks' },
+  { href: '/plan', label: 'Plan' },
   { href: '/learning', label: 'Learning' },
   { href: '/finance', label: 'Finance' },
   { href: '/browsing', label: 'Browsing' },
