@@ -5,6 +5,7 @@ import { browsingStats, fmtDuration } from '@/lib/browsing';
 import { fmtINR, fmtINRShort } from '@/lib/finance';
 import { getProfile } from '@/lib/settings';
 import { AgeDisplay } from '@/app/age-display';
+import { BriefContent } from '@/app/brief-content';
 
 export const dynamic = 'force-dynamic';
 
@@ -340,9 +341,7 @@ export default async function Dashboard() {
                 Today&apos;s brief · {brief.day}
               </summary>
               <div className="border-l-2 border-ember mx-5 mb-4 px-4 lg:max-h-[26rem] lg:overflow-y-auto">
-                <pre className="font-voice whitespace-pre-wrap text-[15px] leading-7 text-linen/95">
-                  {brief.content}
-                </pre>
+                <BriefContent content={brief.content} />
               </div>
             </details>
           )}
