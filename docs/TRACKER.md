@@ -181,6 +181,7 @@ One `learning` concept (kind: book|course), unit-based progress, coached in the 
 ### Goals & nightly planner [[SPEC-0010]]
 - [x] [x] Goals: table + /goals page + home pace card; progress auto-computed from the timeline (networth / books-finished / learning-units-week metrics), pace math ("behind; needs +₹44k/month") — verified locally 2026-07-14
 - [x] [x] Nightly planner: /plan — intent → Claude time-blocks tomorrow around calendar + routines + deadlines + goal pace; plan feeds next morning's brief; evening nudge links to /plan — generation verified locally 2026-07-14
+  - [x] [ ] /plan load-error state: a failed `/api/plan` fetch no longer sticks on "Loading tomorrow…" forever — now shows "Couldn't load tomorrow · Try again" with a retry (2026-07-15 night)
 - [x] [ ] Google Calendar OAuth (read + write `[vivy]` blocks): flow + token store + live-query + create/replace built — **needs user's GOOGLE_CLIENT_ID/SECRET, then connect + live verify**
 - [ ] [ ] Health goal metrics (sleep/meals) — capture events exist (SPEC-0011); metric registry entries still to add
 

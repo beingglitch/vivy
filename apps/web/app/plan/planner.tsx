@@ -19,10 +19,15 @@ export function Planner() {
   const [plan, setPlan] = useState<Plan | null>(null);
   const [busy, setBusy] = useState<'' | 'plan' | 'calendar'>('');
   const [calMsg, setCalMsg] = useState('');
+  const [loadErr, setLoadErr] = useState(false);
 
-  useEffect(() => {
+  function load() {
+    setLoadErr(false);
     fetch('/api/plan')
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error(String(r.status));
+        return r.json();
+      })
       .then((c: Ctx) => {
         setCtx(c);
         if (c.existing) {
@@ -30,8 +35,10 @@ export function Planner() {
           setIntent(c.existing.intent ?? '');
         }
       })
-      .catch(() => setCtx(null));
-  }, []);
+      .catch(() => setLoadErr(true));
+  }
+
+  useEffect(load, []);
 
   async function generate() {
     setBusy('plan');
@@ -66,6 +73,15 @@ export function Planner() {
     }
   }
 
+  if (loadErr)
+    return (
+      <p className="text-sm text-moth">
+        Couldn&apos;t load tomorrow.{' '}
+        <button onClick={load} className="text-ember underline-offset-2 hover:underline">
+          Try again
+        </button>
+      </p>
+    );
   if (!ctx) return <p className="text-sm text-moth">Loading tomorrow…</p>;
 
   return (
