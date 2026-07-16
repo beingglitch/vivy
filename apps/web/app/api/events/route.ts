@@ -24,6 +24,15 @@ type IncomingEvent = {
   payload?: Record<string, unknown>;
 };
 
+// Parse a client-supplied timestamp. Returns a valid Date, or null if the
+// string is present but unparseable (so the caller can reject it) — a bad
+// clock string must never become an Invalid Date that 500s the insert.
+function parseTs(value: unknown): Date | null {
+  if (value === undefined || value === null || value === '') return new Date();
+  const d = new Date(value as string | number);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
 // The one pipe. Every ingestor — browser extension, screen agent, finance,
 // recorder hardware — POSTs one event or an array of them here.
 export async function POST(req: NextRequest) {
@@ -37,24 +46,25 @@ export async function POST(req: NextRequest) {
   if (items.length === 0 || items.length > 500) {
     return NextResponse.json({ error: 'expected 1–500 events' }, { status: 400 });
   }
+  const rows: { source: string; type: string; ts: Date; title: string | null; payload: Record<string, unknown> }[] = [];
   for (const e of items) {
     if (!e || typeof e.source !== 'string' || typeof e.type !== 'string') {
       return NextResponse.json({ error: 'each event needs source and type' }, { status: 400 });
     }
+    const ts = parseTs(e.ts);
+    if (!ts) {
+      return NextResponse.json({ error: 'ts must be a valid date' }, { status: 400 });
+    }
+    rows.push({
+      source: e.source,
+      type: e.type,
+      ts,
+      title: e.title ?? null,
+      payload: e.payload ?? {},
+    });
   }
 
-  const inserted = await db
-    .insert(events)
-    .values(
-      items.map((e) => ({
-        source: e.source,
-        type: e.type,
-        ts: e.ts ? new Date(e.ts) : new Date(),
-        title: e.title ?? null,
-        payload: e.payload ?? {},
-      })),
-    )
-    .returning({ id: events.id });
+  const inserted = await db.insert(events).values(rows).returning({ id: events.id });
 
   // Fire-and-forget after the response: text events → AI task extraction now.
   if (items.some((e) => INSTANT_TYPES.has(e.type))) {
@@ -77,8 +87,16 @@ export async function GET(req: NextRequest) {
   const conds = [];
   if (p.get('source')) conds.push(eq(events.source, p.get('source')!));
   if (p.get('type')) conds.push(eq(events.type, p.get('type')!));
-  if (p.get('since')) conds.push(gte(events.ts, new Date(p.get('since')!)));
-  const limit = Math.min(Number(p.get('limit') ?? 100), 500);
+  if (p.get('since')) {
+    const since = new Date(p.get('since')!);
+    if (Number.isNaN(since.getTime())) {
+      return NextResponse.json({ error: 'since must be a valid date' }, { status: 400 });
+    }
+    conds.push(gte(events.ts, since));
+  }
+  // A bad limit (NaN, 0, negative) must fall back to the default, never reach .limit().
+  const rawLimit = Math.floor(Number(p.get('limit')));
+  const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 500) : 100;
 
   const rows = await db
     .select()
