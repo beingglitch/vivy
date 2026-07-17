@@ -42,9 +42,12 @@ export function fmtINR(n: number): string {
   return '₹' + n.toLocaleString('en-IN', { maximumFractionDigits: 2 });
 }
 
-// Compact form for chart labels: ₹1.2k, ₹45k, ₹2.3L
+// Compact form for chart labels: ₹1.2k, ₹45k, ₹2.3L. Sign-aware so a negative
+// net worth (debts outweigh assets) reads as -₹2.5L, not ₹-250000.
 export function fmtINRShort(n: number): string {
-  if (n >= 100000) return `₹${(n / 100000).toFixed(n >= 1000000 ? 0 : 1)}L`;
-  if (n >= 1000) return `₹${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k`;
-  return `₹${Math.round(n)}`;
+  const sign = n < 0 ? '-' : '';
+  const a = Math.abs(n);
+  if (a >= 100000) return `${sign}₹${(a / 100000).toFixed(a >= 1000000 ? 0 : 1)}L`;
+  if (a >= 1000) return `${sign}₹${(a / 1000).toFixed(a >= 10000 ? 0 : 1)}k`;
+  return `${sign}₹${Math.round(a)}`;
 }

@@ -98,6 +98,7 @@ One `learning` concept (kind: book|course), unit-based progress, coached in the 
 - [x] [x] Income entry (spent/got toggle on quick entry) + money-flow card (in vs out, net) — rendered 2026-07-11
 - [x] [x] Donut chart of month-by-category (validated dark palette, legend w/ % + amounts) — screenshot-verified 2026-07-11
 - [x] [x] Net worth: `positions` table (assets/liabilities, consider flag, planned payments) + huge centered hero number — GET/PATCH curl-verified + screenshot 2026-07-11
+  - [x] [ ] `fmtINRShort` is sign-aware: a negative net worth now reads `-₹3L`, not `₹-300000` (minus was misplaced + compaction skipped for negatives) — node-verified across cases + build 2026-07-17
 - [x] [x] Net-worth history: `networth_snapshots` (upsert on every position change + daily cron) + trend chart on /finance — seeded + rendered 2026-07-11
 - [x] [x] Notion "Finance Tracker" one-time import: 10 positions (incl. 5 personal debts, college fee not-counted) + 7 recurring rules — verified in DB + UI 2026-07-11
 - [x] [ ] Recurring rules: `recurring` table + UI (add/edit/pause/remove) + next-month forecast (recurring + planned debt payments + pace) — rows render; PATCH/DELETE untested
