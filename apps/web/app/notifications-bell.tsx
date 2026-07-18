@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
-// Header bell: unread dot fetched client-side so the (server) layout stays
+// Header bell: unread count fetched client-side so the (server) layout stays
 // out of the request path. Visiting /notifications clears it.
 export function NotificationsBell() {
   const [unread, setUnread] = useState(0);
@@ -21,6 +21,7 @@ export function NotificationsBell() {
     <Link
       href="/notifications"
       title="Notifications"
+      aria-label={unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'}
       className="relative text-moth transition-colors hover:text-linen"
     >
       <svg
@@ -35,7 +36,12 @@ export function NotificationsBell() {
         <path d="M10 19a2.2 2.2 0 0 0 4 0" strokeLinecap="round" />
       </svg>
       {unread > 0 && (
-        <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-ember" aria-hidden />
+        <span
+          className="absolute -top-1.5 -right-1.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-ember px-1 font-mono text-[9px] leading-none font-medium text-night"
+          aria-hidden
+        >
+          {unread > 9 ? '9+' : unread}
+        </span>
       )}
     </Link>
   );
