@@ -15,22 +15,30 @@ type Ctx = { day: string; calendar: CalEvent[] | null; fixed: string; existing: 
 
 export function Planner() {
   const [ctx, setCtx] = useState<Ctx | null>(null);
+  const [loadErr, setLoadErr] = useState('');
   const [intent, setIntent] = useState('');
   const [plan, setPlan] = useState<Plan | null>(null);
   const [busy, setBusy] = useState<'' | 'plan' | 'calendar'>('');
   const [calMsg, setCalMsg] = useState('');
 
+  async function load() {
+    setLoadErr('');
+    try {
+      const res = await fetch('/api/plan');
+      if (!res.ok) throw new Error(res.statusText);
+      const c: Ctx = await res.json();
+      setCtx(c);
+      if (c.existing) {
+        setPlan(c.existing);
+        setIntent(c.existing.intent ?? '');
+      }
+    } catch {
+      setLoadErr("Couldn't load tomorrow. Check your connection and try again.");
+    }
+  }
+
   useEffect(() => {
-    fetch('/api/plan')
-      .then((r) => r.json())
-      .then((c: Ctx) => {
-        setCtx(c);
-        if (c.existing) {
-          setPlan(c.existing);
-          setIntent(c.existing.intent ?? '');
-        }
-      })
-      .catch(() => setCtx(null));
+    load();
   }, []);
 
   async function generate() {
@@ -66,6 +74,18 @@ export function Planner() {
     }
   }
 
+  if (loadErr)
+    return (
+      <div className="rounded-xl border border-seam bg-veil p-5">
+        <p className="text-sm text-rose">{loadErr}</p>
+        <button
+          onClick={load}
+          className="mt-3 rounded-lg border border-seam px-3 py-1.5 text-sm text-moth hover:text-linen"
+        >
+          Try again
+        </button>
+      </div>
+    );
   if (!ctx) return <p className="text-sm text-moth">Loading tomorrow…</p>;
 
   return (
