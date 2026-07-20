@@ -64,6 +64,7 @@ Tasks are the first-class citizen: created manually, by chat, or extracted from 
 The Jarvis moment: every morning Vivy decides and tells me the plan.
 
 - [x] [x] Brief generator: Claude reads open tasks + deadlines + 7-day trend + memories → ranked coach-style plan (`lib/ai/daily-brief.ts`, Sonnet) — verified locally 2026-07-08, real brief generated
+- [x] [ ] Brief resilience: every enrichment context piece (goals/health/browsing/spend/trend/structure/plan/memory) degrades to empty on error, so one failing query can't blank the whole morning brief — build-verified 2026-07-20, real run pending
 - [x] [ ] Vercel Cron job (09:15 IST) writes the brief; dashboard shows today's brief card
 - [ ] [ ] Brief delivery channel (email or Telegram push)
 - [ ] [ ] Evening review: what got done, what rolls over
