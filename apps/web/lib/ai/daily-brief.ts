@@ -1,13 +1,33 @@
 import { generateText } from 'ai';
 import { and, desc, eq, gte, inArray, isNotNull, ne, sql } from 'drizzle-orm';
 import { db, briefs, events, learning, projects, routines, tasks, transactions } from '@/lib/db';
-import { browsingStats, fmtDuration } from '@/lib/browsing';
+import { browsingStats, fmtDuration, type BrowsingStats } from '@/lib/browsing';
 import { istToday, dayOfWeek, weekMonday } from '@/lib/routines';
 import { goalsContext } from '@/lib/goals';
 import { healthContext } from '@/lib/health';
 import { VIVY_MODEL, VIVY_PERSONA, memoryContext } from './index';
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+// The brief is the day's most important output. It pulls together many enrichment
+// queries (goals, health, browsing, spend…); one of them failing must NOT blank the
+// whole morning brief. Core task reads stay strict — a brief with no tasks is
+// meaningless — but every extra context piece degrades to a neutral value on error.
+function safe<T>(p: Promise<T>, fallback: T): Promise<T> {
+  return p.catch((e) => {
+    console.error('daily-brief: an enrichment context piece failed, skipping it', e);
+    return fallback;
+  });
+}
+
+const EMPTY_STATS: BrowsingStats = {
+  videos: [],
+  searches: [],
+  domains: [],
+  videoTypes: [],
+  totalVideoSeconds: 0,
+  totalBrowseSeconds: 0,
+};
 
 // Routines due today (with weekly progress) + active areas/projects gone quiet —
 // the shape of the task world, so the brief can nag about silence, not just items.
@@ -240,15 +260,15 @@ export async function generateDailyBrief(): Promise<{ day: string; content: stri
       .from(tasks)
       .where(and(inArray(tasks.status, ['done']), gte(tasks.completedAt, yesterday)))
       .limit(30),
-    browsingStats(yesterday),
-    memoryContext(),
-    weeklyTrend(),
-    learningContext(),
-    spendContext(),
-    structureContext(),
-    goalsContext(),
-    todaysPlanContext(),
-    healthContext(),
+    safe(browsingStats(yesterday), EMPTY_STATS),
+    safe(memoryContext(), ''),
+    safe(weeklyTrend(), ''),
+    safe(learningContext(), ''),
+    safe(spendContext(), ''),
+    safe(structureContext(), ''),
+    safe(goalsContext(), ''),
+    safe(todaysPlanContext(), ''),
+    safe(healthContext(), ''),
   ]);
 
   const context = [
