@@ -157,10 +157,13 @@ async function spendContext(): Promise<string> {
 async function weeklyTrend(): Promise<string> {
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
+  // Bucket by IST calendar day (timestamptz → Kolkata wall-clock before to_char),
+  // so these day labels match istToday() and the rest of the brief — otherwise
+  // late-night activity lands on the previous (UTC) day and the coaching lies.
   const [browse, done] = await Promise.all([
     db
       .select({
-        day: sql<string>`to_char(${events.ts}, 'YYYY-MM-DD')`,
+        day: sql<string>`to_char(${events.ts} at time zone 'Asia/Kolkata', 'YYYY-MM-DD')`,
         seconds: sql<number>`coalesce(sum((${events.payload}->>'seconds')::numeric), 0)`,
         videoSeconds: sql<number>`coalesce(sum((${events.payload}->>'seconds')::numeric) filter (where ${events.type} = 'video.watch'), 0)`,
       })
@@ -170,7 +173,7 @@ async function weeklyTrend(): Promise<string> {
       .orderBy(sql`1`),
     db
       .select({
-        day: sql<string>`to_char(${tasks.completedAt}, 'YYYY-MM-DD')`,
+        day: sql<string>`to_char(${tasks.completedAt} at time zone 'Asia/Kolkata', 'YYYY-MM-DD')`,
         count: sql<number>`count(*)`,
       })
       .from(tasks)
