@@ -4,6 +4,7 @@ import { and, desc, eq, gte, sql } from 'drizzle-orm';
 import { db, events } from '@/lib/db';
 import { verifySessionValue, SESSION_COOKIE } from '@/lib/auth';
 import { processEvents } from '@/lib/ai/process-events';
+import { intParam, dateParam } from '@/lib/query';
 
 // Types worth processing the moment they arrive (task extraction). Analytics
 // events (video.watch, page.visit…) wait for the cron sweep instead.
@@ -77,8 +78,9 @@ export async function GET(req: NextRequest) {
   const conds = [];
   if (p.get('source')) conds.push(eq(events.source, p.get('source')!));
   if (p.get('type')) conds.push(eq(events.type, p.get('type')!));
-  if (p.get('since')) conds.push(gte(events.ts, new Date(p.get('since')!)));
-  const limit = Math.min(Number(p.get('limit') ?? 100), 500);
+  const since = dateParam(p.get('since'));
+  if (since) conds.push(gte(events.ts, since));
+  const limit = intParam(p.get('limit'), { fallback: 100, min: 1, max: 500 });
 
   const rows = await db
     .select()
