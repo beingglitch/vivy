@@ -21,6 +21,7 @@ export function TxEntry({ bills = [] }: { bills?: Bill[] }) {
   const [mode, setMode] = useState<'expense' | 'income'>('expense');
   const [busy, setBusy] = useState(false);
   const [flash, setFlash] = useState('');
+  const [flashErr, setFlashErr] = useState(false);
   const amountRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
@@ -43,12 +44,17 @@ export function TxEntry({ bills = [] }: { bills?: Bill[] }) {
     });
     setBusy(false);
     if (res.ok) {
+      setFlashErr(false);
       setFlash(`${mode === 'income' ? '+' : ''}₹${n} · ${category} — saved`);
       setAmount('');
       setNote('');
       amountRef.current?.focus();
       setTimeout(() => setFlash(''), 2500);
       router.refresh();
+    } else {
+      // Don't clear the amount — let him tap again after a failed save.
+      setFlashErr(true);
+      setFlash('Could not save — check your connection and try again.');
     }
   }
 
@@ -71,11 +77,15 @@ export function TxEntry({ bills = [] }: { bills?: Bill[] }) {
     });
     setBusy(false);
     if (res.ok) {
+      setFlashErr(false);
       setFlash(`₹${n} · ${bill.name} — bill settled`);
       setAmount('');
       setNote('');
       setTimeout(() => setFlash(''), 2500);
       router.refresh();
+    } else {
+      setFlashErr(true);
+      setFlash('Could not settle the bill — try again.');
     }
   }
 
@@ -156,7 +166,7 @@ export function TxEntry({ bills = [] }: { bills?: Bill[] }) {
           )}
         </div>
       )}
-      <p className="text-xs text-moth/70" aria-live="polite">
+      <p className={`text-xs ${flashErr ? 'text-rose' : 'text-moth/70'}`} aria-live="polite">
         {flash || 'Type the amount, tap a category — done. Tap a bill to settle it for the month.'}
       </p>
     </section>
