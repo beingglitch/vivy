@@ -103,6 +103,7 @@ One `learning` concept (kind: book|course), unit-based progress, coached in the 
 - [x] [ ] Recurring rules: `recurring` table + UI (add/edit/pause/remove) + next-month forecast (recurring + planned debt payments + pace) — rows render; PATCH/DELETE untested
 - [x] [ ] Voice input (Web Speech API) on chat + finance note — mic renders 2026-07-11; real dictation not yet tried
 - [x] [x] Bills vs daily split: `transactions.recurring_id`, one-tap settle chips, paid-of-total header + progress bar, daily chart/pace exclude bills — API-tested + screenshots 2026-07-12; header re-cut to daily / monthly / recurring (daily + recurring = monthly) same day
+- [x] [ ] Save/settle error state on quick entry: failed POST now shows a rose "Could not save — try again" line (was a silent no-op) — build-verified 2026-07-23, real click pending
 - [x] [ ] Age display toggle on both heroes: days-to-next-birthday ↔ years+months, persisted — countdown state screenshot-verified 2026-07-12; the tap itself needs a real click
 - [ ] [ ] Replace manual with auto-ingestion (Epic 3: SMS/Gmail/bank) — manual stays as fallback
 
