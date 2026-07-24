@@ -48,6 +48,7 @@ Every ingestor (browser, screen agent, finance, recorder) POSTs to this. The tim
 - [x] [x] `events` table: id, ts, source, type, title, payload (jsonb), processed flag
 - [x] [x] `POST /api/events` with API-key auth, single or batch (1–500) — curl-verified local + prod
 - [x] [x] `GET /api/events` timeline query (source/type/since/limit) — curl-verified
+- [x] [ ] Input hardening on `/api/events`: a malformed `ts` is rejected with 400 before the batch insert (one bad timestamp used to 500 the whole batch); GET clamps `limit` to 1–500 and 400s an invalid `since` (was `.limit(NaN)` / `Invalid Date` SQL) — build-verified 2026-07-24, not yet exercised against a real ingestor
 - [x] [x] Processing loop: unprocessed events → AI handler by type → derived records. `lib/ai/process-events.ts` (Haiku), runs after each text-event ingest (`after()`) + `/api/cron/process`. Verified 2026-07-08 after gateway unlock: 3 analyzed, 2 correct tasks proposed, 0 errors
 
 ### Task pipeline [[SPEC-0001]]

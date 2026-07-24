@@ -41,6 +41,10 @@ export async function POST(req: NextRequest) {
     if (!e || typeof e.source !== 'string' || typeof e.type !== 'string') {
       return NextResponse.json({ error: 'each event needs source and type' }, { status: 400 });
     }
+    // Guard bad timestamps: one malformed ts must not 500 the whole batch insert.
+    if (e.ts !== undefined && Number.isNaN(new Date(e.ts).getTime())) {
+      return NextResponse.json({ error: 'invalid ts (use ISO 8601)' }, { status: 400 });
+    }
   }
 
   const inserted = await db
@@ -77,8 +81,16 @@ export async function GET(req: NextRequest) {
   const conds = [];
   if (p.get('source')) conds.push(eq(events.source, p.get('source')!));
   if (p.get('type')) conds.push(eq(events.type, p.get('type')!));
-  if (p.get('since')) conds.push(gte(events.ts, new Date(p.get('since')!)));
-  const limit = Math.min(Number(p.get('limit') ?? 100), 500);
+  if (p.get('since')) {
+    const since = new Date(p.get('since')!);
+    if (Number.isNaN(since.getTime())) {
+      return NextResponse.json({ error: 'invalid since (use ISO 8601)' }, { status: 400 });
+    }
+    conds.push(gte(events.ts, since));
+  }
+  // Clamp limit to 1–500; a non-numeric or junk value falls back to the default.
+  const rawLimit = Number(p.get('limit'));
+  const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(Math.floor(rawLimit), 500) : 100;
 
   const rows = await db
     .select()
