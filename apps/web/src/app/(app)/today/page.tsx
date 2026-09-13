@@ -1,16 +1,13 @@
-import { Empty } from '@/components/empty';
-import { Composer, TabBar } from '@/components/shell';
+import { doneToday, listTasks } from '@/lib/tasks';
+import { requireUserId } from '@/lib/session';
+import { TodayDock, TodayScreen } from './today-screen';
 
 export const dynamic = 'force-dynamic';
 
-/**
- * Today.
- *
- * Empty on a new account, and empty for everyone right now: there is no tasks
- * table yet, so there is nothing to read. When one exists this reads it and the
- * empty state becomes the genuinely-nothing-today case.
- */
-export default function TodayPage() {
+export default async function TodayPage() {
+  const userId = await requireUserId();
+  const [open, done] = await Promise.all([listTasks(userId), doneToday(userId)]);
+
   const today = new Date().toLocaleDateString('en-GB', {
     weekday: 'long',
     day: 'numeric',
@@ -29,13 +26,10 @@ export default function TodayPage() {
       </div>
 
       <div className="screen screen--flush">
-        <Empty title="Nothing planned" hint="Tasks you add will show here, grouped by focus area." />
+        <TodayScreen open={open} done={done} />
       </div>
 
-      <div className="dock">
-        <Composer placeholder="Add or complete a task…" />
-        <TabBar />
-      </div>
+      <TodayDock />
     </>
   );
 }

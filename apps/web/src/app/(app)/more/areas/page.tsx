@@ -1,37 +1,22 @@
-import { Empty } from '@/components/empty';
-import { PlusIcon } from '@/components/icons';
 import { Dock } from '@/components/shell';
+import { listAreas } from '@/lib/areas';
+import { requireUserId } from '@/lib/session';
+import { AreasScreen } from './areas-screen';
 
 export const dynamic = 'force-dynamic';
 
 /**
  * Focus areas.
  *
- * Areas group tasks and give each stream its cadence and colour. None exist on a
- * new account.
+ * Areas group tasks and give each one a cadence, which is what lets Vivy say
+ * something has gone quiet rather than just listing what is left.
  */
-export default function AreasPage() {
+export default async function AreasPage() {
+  const areas = await listAreas(await requireUserId());
+
   return (
     <>
-      <div className="header">
-        <div className="header__row">
-          <div className="header__titles">
-            <h1 className="title">Focus areas</h1>
-            <span className="subtitle">None yet</span>
-          </div>
-          <button className="iconbtn" aria-label="New area">
-            <PlusIcon />
-          </button>
-        </div>
-      </div>
-
-      <div className="screen">
-        <Empty
-          title="No focus areas"
-          hint="Areas group your work and give each one a cadence, so Vivy can tell when something has gone cold."
-        />
-      </div>
-
+      <AreasScreen areas={areas} />
       <Dock />
     </>
   );

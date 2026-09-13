@@ -1793,3 +1793,179 @@ a {
   font-size: 11px;
   color: #9a5b12;
 }
+
+/* ------------------------------------------------- areas, tasks, quadrant -- */
+
+.arealist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.arearow {
+  border-top: 1px solid var(--line-1);
+  padding: 12px 20px;
+}
+.arearow__head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+.arearow__name {
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.arearow__cold {
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: #9a5b12;
+  background: #fdf4e7;
+  border-radius: 5px;
+  padding: 2px 6px;
+}
+.arearow__count {
+  margin-left: auto;
+  font-size: 11.5px;
+  color: var(--grey-3);
+}
+.arearow__meta {
+  margin: 4px 0 0 16px;
+  font-size: 11.5px;
+  color: var(--grey-3);
+}
+.arearow__panel {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.areaform {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--line-1);
+}
+.areaform__actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+}
+.swatch--on {
+  border-color: var(--ink);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.chip {
+  font-size: 12.5px;
+  padding: 6px 11px;
+  border-radius: 20px;
+  border: 1px solid var(--line-4);
+  background: var(--paper);
+  color: var(--grey-5);
+  cursor: pointer;
+}
+.chip--on {
+  border-color: var(--accent);
+  background: var(--accent-wash);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.quadrant__task {
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+.qcard {
+  margin: 14px 20px 0;
+  padding: 13px;
+  border: 1px solid var(--line-4);
+  border-radius: 14px;
+  background: var(--paper);
+}
+.qcard__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.qcard__title {
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.qcard__meta {
+  margin: 5px 0 0 16px;
+  font-size: 11.5px;
+  color: var(--grey-3);
+}
+.qcard__actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 11px;
+}
+
+.qlist {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0 20px;
+}
+
+.todaylist {
+  padding: 0 20px;
+}
+.todaygroup {
+  margin-top: 18px;
+}
+.todaygroup__head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--grey-3);
+  margin-bottom: 2px;
+}
+
+.task__box {
+  background: none;
+  cursor: pointer;
+  padding: 0;
+}
+.task__body {
+  background: none;
+  border: 0;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+}

@@ -90,8 +90,20 @@ export function TabBar() {
  * Typing turns the mic into a send button, the design shows both states, and
  * showing send on an empty field would offer an action that does nothing.
  */
-export function Composer({ placeholder = 'Tell Vivy…' }: { placeholder?: string }) {
+export function Composer({
+  placeholder = 'Tell Vivy…',
+  onSubmit,
+}: {
+  placeholder?: string;
+  /**
+   * What to do with the typed text. Without one the field still clears, which
+   * keeps it honest until the chat endpoint lands: a bar that swallows input
+   * and reloads the page is worse than one that visibly does nothing.
+   */
+  onSubmit?: (text: string) => Promise<void> | void;
+}) {
   const [value, setValue] = useState('');
+  const [busy, setBusy] = useState(false);
   const hasText = value.trim().length > 0;
 
   return (
@@ -99,9 +111,14 @@ export function Composer({ placeholder = 'Tell Vivy…' }: { placeholder?: strin
       className={`composer${hasText ? ' composer--active' : ''}`}
       onSubmit={(e) => {
         e.preventDefault();
-        // Wiring to the tool layer lands with the chat endpoint; until then the
-        // field must still behave, so submitting clears rather than reloading.
+        const text = value.trim();
+        if (!text || busy) return;
+        // Cleared first so the field is ready for the next thought rather than
+        // blocked on a round trip.
         setValue('');
+        if (!onSubmit) return;
+        setBusy(true);
+        void Promise.resolve(onSubmit(text)).finally(() => setBusy(false));
       }}
     >
       <input

@@ -445,3 +445,63 @@ export const authAttempts = pgTable('auth_attempts', {
   firstFailureAt: timestamp('first_failure_at', { withTimezone: true }).notNull().defaultNow(),
   lockedUntil: timestamp('locked_until', { withTimezone: true }),
 });
+
+/**
+ * Focus areas.
+ *
+ * The grouping every task hangs off, and the thing a cadence is measured
+ * against: an area with a seven day cadence that has seen nothing for ten is
+ * what "gone cold" means. Colour is stored because the whole interface reads by
+ * colour before it reads by name.
+ */
+export const areas = pgTable(
+  'areas',
+  {
+    id: uuid('id').primaryKey(),
+    userId: uuid('user_id').notNull(),
+    name: text('name').notNull(),
+    /** Hex, chosen from a fixed palette in the UI so the screens stay coherent. */
+    colour: text('colour').notNull(),
+    /**
+     * How often this area should see activity, in days. Null means it is not
+     * something that can go stale, like "Admin".
+     */
+    cadenceDays: integer('cadence_days'),
+    /** Archived rather than deleted, so tasks that referenced it still read. */
+    archivedAt: timestamp('archived_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('areas_user_name_idx').on(t.userId, t.name)]);
+
+/**
+ * Tasks.
+ *
+ * Two numbers decide where a task sits on the quadrant: how much it matters and
+ * how long it takes. Both are the user's estimate, deliberately coarse, because
+ * a precise estimate of either is a fiction and asking for one stops people
+ * writing anything down.
+ */
+export const tasks = pgTable(
+  'tasks',
+  {
+    id: uuid('id').primaryKey(),
+    userId: uuid('user_id').notNull(),
+    /** Null is allowed: a task you have not filed yet is still a task. */
+    areaId: uuid('area_id'),
+    title: text('title').notNull(),
+    /** 1 low, 2 normal, 3 high, 4 critical. The quadrant's vertical axis. */
+    importance: integer('importance').notNull().default(2),
+    /** Estimated minutes. The horizontal axis, and the size of the dot. */
+    effortMinutes: integer('effort_minutes').notNull().default(30),
+    /** open | done | dropped. Dropped is kept so it stops being suggested. */
+    status: text('status').notNull().default('open'),
+    dueAt: timestamp('due_at', { withTimezone: true }),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('tasks_user_status_idx').on(t.userId, t.status),
+    index('tasks_area_idx').on(t.userId, t.areaId),
+  ]);
