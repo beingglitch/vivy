@@ -106,7 +106,14 @@ export function TodayDock() {
             areaId: null,
             importance: 2,
             effortMinutes: 30,
+            deadlineKind: 'none',
             dueAt: null,
+            dueAmount: null,
+            dueUnit: null,
+            placeLabel: null,
+            lat: null,
+            lng: null,
+            radiusM: null,
           });
         }}
       />

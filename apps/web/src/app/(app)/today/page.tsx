@@ -1,4 +1,4 @@
-import { doneToday, listTasks } from '@/lib/tasks';
+import { doneToday, listTasks, retireExpired } from '@/lib/tasks';
 import { requireUserId } from '@/lib/session';
 import { TodayDock, TodayScreen } from './today-screen';
 
@@ -6,6 +6,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function TodayPage() {
   const userId = await requireUserId();
+  await retireExpired(userId);
   const [open, done] = await Promise.all([listTasks(userId), doneToday(userId)]);
 
   const today = new Date().toLocaleDateString('en-GB', {

@@ -3,9 +3,10 @@
 import { useState, useTransition } from 'react';
 import type { Area } from '@/lib/areas';
 import type { Task } from '@/lib/tasks';
-import { EFFORTS, IMPORTANCE } from '@/lib/task-scales';
+import { EFFORTS, IMPORTANCE, unplace } from '@/lib/task-scales';
 import { PlusIcon } from '@/components/icons';
-import { addTask, completeTask, removeTask } from './actions';
+import { completeTask, removeTask } from './actions';
+import { TaskForm } from './task-form';
 
 /**
  * The grid is drawn whether or not anything sits in it.
@@ -15,8 +16,29 @@ import { addTask, completeTask, removeTask } from './actions';
  * grid teaches where work will land.
  */
 export function QuadrantScreen({ tasks, areas }: { tasks: Task[]; areas: Area[] }) {
-  const [adding, setAdding] = useState(false);
+  // Where the new task will land, taken from the tap. Null means the form is
+  // closed; the centre is used when it is opened from the header button
+  // instead, because that gesture says nothing about placement.
+  const [draft, setDraft] = useState<{ importance: number; effortMinutes: number } | null>(null);
   const [selected, setSelected] = useState<Task | null>(null);
+
+  /**
+   * Tapping the grid says both numbers at once.
+   *
+   * The position is read from the element rather than the event's page
+   * coordinates, so it stays correct inside a scrolled screen and at any
+   * width.
+   */
+  function tapGrid(event: React.MouseEvent<HTMLDivElement>) {
+    // Ignore taps that landed on a dot; those select rather than create.
+    if ((event.target as HTMLElement).closest('.quadrant__task')) return;
+
+    const box = event.currentTarget.getBoundingClientRect();
+    const x = ((event.clientX - box.left) / box.width) * 100;
+    const y = ((event.clientY - box.top) / box.height) * 100;
+    setSelected(null);
+    setDraft(unplace(x, y));
+  }
 
   return (
     <>
@@ -32,10 +54,11 @@ export function QuadrantScreen({ tasks, areas }: { tasks: Task[]; areas: Area[] 
           </div>
           <button
             className="iconbtn"
-            aria-label={adding ? 'Cancel' : 'New task'}
+            aria-label={draft ? 'Cancel' : 'New task'}
             onClick={() => {
-              setAdding((v) => !v);
               setSelected(null);
+              // Middle of the board, since the button says nothing about where.
+              setDraft(draft ? null : { importance: 2, effortMinutes: 30 });
             }}
           >
             <PlusIcon />
@@ -48,7 +71,7 @@ export function QuadrantScreen({ tasks, areas }: { tasks: Task[]; areas: Area[] 
           <div className="axis-y">
             <span>Important + due</span>
           </div>
-          <div className="quadrant">
+          <div className="quadrant" onClick={tapGrid} role="presentation">
             {/* Top-left is tinted: important and quick, the place to look first. */}
             <div className="quadrant__hot" />
             <div className="quadrant__vline" />
@@ -85,12 +108,19 @@ export function QuadrantScreen({ tasks, areas }: { tasks: Task[]; areas: Area[] 
         ) : (
           <p className="quadrant__note">
             {tasks.length === 0
-              ? 'Open tasks appear here as dots, placed by how important they are against how long they take. Bigger dot, longer job.'
-              : 'Tap a dot to see the task. Top left is important and quick, so start there.'}
+              ? 'Tap anywhere on the grid to add a task there. Left is quick, top is important.'
+              : 'Tap a dot to open it, or an empty spot to add a task there.'}
           </p>
         )}
 
-        {adding ? <TaskForm areas={areas} onDone={() => setAdding(false)} /> : null}
+        {draft ? (
+          <TaskForm
+            areas={areas}
+            importance={draft.importance}
+            effortMinutes={draft.effortMinutes}
+            onDone={() => setDraft(null)}
+          />
+        ) : null}
 
         {tasks.length > 0 ? (
           <ul className="qlist">
@@ -118,11 +148,15 @@ function TaskRow({ task, onSelect }: { task: Task; onSelect: () => void }) {
         onClick={() => start(() => void completeTask(task.id))}
       />
       <button className="task__body" onClick={onSelect}>
-        <span className="task__title">{task.title}</span>
+        <span className="task__title">
+          {task.title}
+          {task.behind ? <span className="behind">behind</span> : null}
+        </span>
         <span className="task__meta">
           {task.areaName ? `${task.areaName} · ` : ''}
           {importanceLabel(task.importance)} · {effortLabel(task.effortMinutes)}
           {task.dueAt ? ` · due ${new Date(task.dueAt).toLocaleDateString('en-GB')}` : ''}
+          {task.placeLabel ? ` · ${task.placeLabel}` : ''}
         </span>
       </button>
     </div>
@@ -170,128 +204,6 @@ function TaskCard({ task, onClose }: { task: Task; onClose: () => void }) {
         </button>
         <button className="btn btn--quiet" onClick={onClose}>
           Close
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function TaskForm({ areas, onDone }: { areas: Area[]; onDone: () => void }) {
-  const [title, setTitle] = useState('');
-  const [areaId, setAreaId] = useState<string | null>(areas[0]?.id ?? null);
-  const [importance, setImportance] = useState(2);
-  const [effort, setEffort] = useState(30);
-  const [due, setDue] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [pending, start] = useTransition();
-
-  return (
-    <div className="areaform">
-      <div className="field">
-        <label className="field__label" htmlFor="t-title">
-          Task
-        </label>
-        <input
-          id="t-title"
-          className="field__input"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="What needs doing?"
-          autoComplete="off"
-        />
-      </div>
-
-      {areas.length > 0 ? (
-        <>
-          <span className="field__label">Area</span>
-          <div className="chips">
-            {areas.map((a) => (
-              <button
-                key={a.id}
-                className={`chip${a.id === areaId ? ' chip--on' : ''}`}
-                onClick={() => setAreaId(a.id)}
-              >
-                {a.name}
-              </button>
-            ))}
-            <button
-              className={`chip${areaId === null ? ' chip--on' : ''}`}
-              onClick={() => setAreaId(null)}
-            >
-              Unfiled
-            </button>
-          </div>
-        </>
-      ) : (
-        <p className="src__controlNote">
-          No focus areas yet. Add one in More, Focus areas, and tasks get its colour.
-        </p>
-      )}
-
-      <span className="field__label">How important</span>
-      <div className="chips">
-        {IMPORTANCE.map((i) => (
-          <button
-            key={i.value}
-            className={`chip${i.value === importance ? ' chip--on' : ''}`}
-            onClick={() => setImportance(i.value)}
-          >
-            {i.label}
-          </button>
-        ))}
-      </div>
-
-      <span className="field__label">How long</span>
-      <div className="chips">
-        {EFFORTS.map((e) => (
-          <button
-            key={e.value}
-            className={`chip${e.value === effort ? ' chip--on' : ''}`}
-            onClick={() => setEffort(e.value)}
-          >
-            {e.label}
-          </button>
-        ))}
-      </div>
-
-      <div className="field">
-        <label className="field__label" htmlFor="t-due">
-          Due (optional)
-        </label>
-        <input
-          id="t-due"
-          type="date"
-          className="field__input"
-          value={due}
-          onChange={(e) => setDue(e.target.value)}
-        />
-      </div>
-
-      {error ? <p className="pair__error">{error}</p> : null}
-
-      <div className="areaform__actions">
-        <button
-          className="btn btn--primary"
-          disabled={pending || !title.trim()}
-          onClick={() => {
-            setError(null);
-            start(async () => {
-              const result = await addTask({
-                title,
-                areaId,
-                importance,
-                effortMinutes: effort,
-                dueAt: due || null,
-              });
-              if (!result.ok) return setError(result.error);
-              onDone();
-            });
-          }}
-        >
-          {pending ? 'Adding…' : 'Add task'}
-        </button>
-        <button className="btn btn--quiet" disabled={pending} onClick={onDone}>
-          Cancel
         </button>
       </div>
     </div>

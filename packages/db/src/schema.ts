@@ -2,6 +2,7 @@ import {
   bigserial,
   boolean,
   date,
+  doublePrecision,
   index,
   integer,
   jsonb,
@@ -494,9 +495,42 @@ export const tasks = pgTable(
     importance: integer('importance').notNull().default(2),
     /** Estimated minutes. The horizontal axis, and the size of the dot. */
     effortMinutes: integer('effort_minutes').notNull().default(30),
-    /** open | done | dropped. Dropped is kept so it stops being suggested. */
+    /**
+     * open | done | dropped | expired.
+     *
+     * `expired` is not a failure state you set, it is what an `expires`
+     * deadline becomes once it passes. Kept rather than deleted so the board
+     * can show what lapsed without it still asking to be done.
+     */
     status: text('status').notNull().default('open'),
     dueAt: timestamp('due_at', { withTimezone: true }),
+    /**
+     * What a missed deadline means. This is the distinction the quadrant
+     * cannot infer:
+     *
+     * - `none`     no deadline at all.
+     * - `expires`  the work dies with the date. A grant you did not apply for
+     *              is not a job still waiting, it is gone.
+     * - `persists` the date passing changes nothing about needing to do it. A
+     *              late assignment is still an assignment, it just falls
+     *              behind.
+     */
+    deadlineKind: text('deadline_kind').notNull().default('none'),
+    /** Kept when the deadline was entered as "in 3 weeks", so it can be shown that way. */
+    dueAmount: integer('due_amount'),
+    dueUnit: text('due_unit'),
+    /**
+     * Where this has to happen, if anywhere.
+     *
+     * A task pinned to a place is one that cannot be done from the sofa, so
+     * reminding you at 9am is useless and reminding you when you arrive is the
+     * whole point.
+     */
+    placeLabel: text('place_label'),
+    lat: doublePrecision('lat'),
+    lng: doublePrecision('lng'),
+    /** Metres. How close counts as "here". */
+    radiusM: integer('radius_m'),
     completedAt: timestamp('completed_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

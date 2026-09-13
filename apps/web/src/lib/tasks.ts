@@ -1,6 +1,6 @@
 import 'server-only';
 import { randomUUID } from 'node:crypto';
-import { and, asc, eq, ne } from 'drizzle-orm';
+import { and, asc, eq, lt, ne } from 'drizzle-orm';
 import { areas, db, tasks } from '@vivy/db';
 import { EFFORTS, IMPORTANCE } from './task-scales';
 
@@ -20,7 +20,16 @@ export interface Task {
   effortMinutes: number;
   status: string;
   dueAt: Date | null;
+  deadlineKind: string;
+  dueAmount: number | null;
+  dueUnit: string | null;
+  placeLabel: string | null;
+  lat: number | null;
+  lng: number | null;
+  radiusM: number | null;
   completedAt: Date | null;
+  /** Past its deadline and the kind says it still has to be done. */
+  behind: boolean;
   areaId: string | null;
   areaName: string | null;
   areaColour: string | null;
@@ -80,6 +89,13 @@ export async function listTasks(userId: string, status = 'open'): Promise<Task[]
       effortMinutes: tasks.effortMinutes,
       status: tasks.status,
       dueAt: tasks.dueAt,
+      deadlineKind: tasks.deadlineKind,
+      dueAmount: tasks.dueAmount,
+      dueUnit: tasks.dueUnit,
+      placeLabel: tasks.placeLabel,
+      lat: tasks.lat,
+      lng: tasks.lng,
+      radiusM: tasks.radiusM,
       completedAt: tasks.completedAt,
       areaId: tasks.areaId,
       areaName: areas.name,
@@ -92,23 +108,76 @@ export async function listTasks(userId: string, status = 'open'): Promise<Task[]
 
   return rows.map((r) => ({
     ...r,
+    behind:
+      r.status === 'open' &&
+      r.deadlineKind === 'persists' &&
+      r.dueAt !== null &&
+      r.dueAt.getTime() < Date.now(),
     ...place(r.importance, r.effortMinutes, r.dueAt),
   }));
 }
 
-export async function createTask(
-  userId: string,
-  input: {
-    title: string;
-    areaId?: string | null;
-    importance?: number;
-    effortMinutes?: number;
-    dueAt?: Date | null;
-  },
-): Promise<void> {
+/**
+ * Retire anything whose deadline was the whole point.
+ *
+ * Done lazily on read rather than by a scheduled job: there is no moment a
+ * lapsed task needs to be noticed except when somebody looks, and a cron that
+ * has to run for the board to be correct is a cron that can silently stop and
+ * leave it wrong.
+ *
+ * Only `expires` tasks are touched. A `persists` one is not late in a way that
+ * cancels it, it is simply behind, which is a different thing and the list says
+ * so.
+ */
+export async function retireExpired(userId: string): Promise<number> {
+  const result = await db()
+    .update(tasks)
+    .set({ status: 'expired', updatedAt: new Date() })
+    .where(
+      and(
+        eq(tasks.userId, userId),
+        eq(tasks.status, 'open'),
+        eq(tasks.deadlineKind, 'expires'),
+        lt(tasks.dueAt, new Date()),
+      ),
+    )
+    .returning({ id: tasks.id });
+  return result.length;
+}
+
+export interface NewTask {
+  title: string;
+  areaId?: string | null;
+  importance?: number;
+  effortMinutes?: number;
+  dueAt?: Date | null;
+  deadlineKind?: string;
+  dueAmount?: number | null;
+  dueUnit?: string | null;
+  placeLabel?: string | null;
+  lat?: number | null;
+  lng?: number | null;
+  radiusM?: number | null;
+}
+
+export async function createTask(userId: string, input: NewTask): Promise<void> {
   const title = input.title.trim();
   if (!title) throw new Error('Give the task a title.');
   if (title.length > 200) throw new Error('That title is too long.');
+
+  const kind = input.deadlineKind ?? 'none';
+  if (!['none', 'expires', 'persists'].includes(kind)) {
+    throw new Error('Unknown deadline type.');
+  }
+  // A deadline kind without a date is a contradiction, and would make the task
+  // permanently "not yet due" rather than doing what was asked.
+  if (kind !== 'none' && !input.dueAt) throw new Error('Pick a date for the deadline.');
+
+  const hasPlace = input.lat != null && input.lng != null;
+  if (hasPlace && !input.radiusM) throw new Error('Choose how close counts as here.');
+  if (input.placeLabel && !hasPlace) {
+    throw new Error('That place has no coordinates, so it cannot raise an alert.');
+  }
 
   await db()
     .insert(tasks)
@@ -119,7 +188,14 @@ export async function createTask(
       areaId: input.areaId ?? null,
       importance: clamp(input.importance ?? 2, 1, 4),
       effortMinutes: clamp(input.effortMinutes ?? 30, 5, 240),
-      dueAt: input.dueAt ?? null,
+      dueAt: kind === 'none' ? null : (input.dueAt ?? null),
+      deadlineKind: kind,
+      dueAmount: input.dueAmount ?? null,
+      dueUnit: input.dueUnit ?? null,
+      placeLabel: hasPlace ? (input.placeLabel ?? null) : null,
+      lat: hasPlace ? input.lat : null,
+      lng: hasPlace ? input.lng : null,
+      radiusM: hasPlace ? input.radiusM : null,
     });
 }
 

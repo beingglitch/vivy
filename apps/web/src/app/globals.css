@@ -1933,3 +1933,24 @@ a {
   text-align: left;
   cursor: pointer;
 }
+.formhint {
+  margin: 2px 0 4px;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--grey-3);
+}
+.behind {
+  margin-left: 7px;
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: #9a5b12;
+  background: #fdf4e7;
+  border-radius: 5px;
+  padding: 2px 6px;
+  vertical-align: 1px;
+}
+.quadrant {
+  cursor: crosshair;
+}

@@ -1,6 +1,6 @@
 import { Dock } from '@/components/shell';
 import { listAreas } from '@/lib/areas';
-import { listTasks } from '@/lib/tasks';
+import { listTasks, retireExpired } from '@/lib/tasks';
 import { requireUserId } from '@/lib/session';
 import { QuadrantScreen } from './quadrant-screen';
 
@@ -14,6 +14,11 @@ export const dynamic = 'force-dynamic';
  */
 export default async function QuadrantPage() {
   const userId = await requireUserId();
+
+  // Before reading, not after: a task whose deadline was the whole point should
+  // never appear on the board one render longer than it deserves.
+  await retireExpired(userId);
+
   const [tasks, areas] = await Promise.all([listTasks(userId), listAreas(userId)]);
 
   return (

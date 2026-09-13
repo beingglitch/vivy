@@ -12,22 +12,42 @@ function refresh() {
   revalidatePath('/more/areas');
 }
 
-export async function addTask(input: {
+export interface TaskInput {
   title: string;
   areaId: string | null;
   importance: number;
   effortMinutes: number;
+  deadlineKind: string;
+  /** ISO date. Dates cross the wire as strings, never as Date objects. */
   dueAt: string | null;
-}): Promise<Result> {
+  dueAmount: number | null;
+  dueUnit: string | null;
+  placeLabel: string | null;
+  lat: number | null;
+  lng: number | null;
+  radiusM: number | null;
+}
+
+export async function addTask(input: TaskInput): Promise<Result> {
   try {
+    const due = input.dueAt ? new Date(input.dueAt) : null;
+    // An unparseable date becomes no date rather than an Invalid Date, which
+    // would poison every placement that touches it.
+    const dueAt = due && !Number.isNaN(due.getTime()) ? due : null;
+
     await createTask(await requireUserId(), {
       title: input.title,
       areaId: input.areaId,
       importance: input.importance,
       effortMinutes: input.effortMinutes,
-      // Dates cross the wire as strings; an invalid one becomes no due date
-      // rather than an Invalid Date that would poison every placement.
-      dueAt: input.dueAt ? new Date(input.dueAt) : null,
+      dueAt,
+      deadlineKind: input.deadlineKind,
+      dueAmount: input.dueAmount,
+      dueUnit: input.dueUnit,
+      placeLabel: input.placeLabel,
+      lat: input.lat,
+      lng: input.lng,
+      radiusM: input.radiusM,
     });
     refresh();
     return { ok: true };
