@@ -3,7 +3,8 @@
   "crons": [
     {
       "path": "/api/push/run",
-      "schedule": "*/15 * * * *"
+      "comment": "06:00 IST. Vercel schedules in UTC and has no timezone setting, so this is 00:30 UTC. Change it twice if you ever move somewhere with daylight saving; India has none.",
+      "schedule": "30 0 * * *"
     }
   ]
 }

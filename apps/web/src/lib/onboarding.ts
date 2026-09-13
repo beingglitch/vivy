@@ -1,5 +1,5 @@
 import 'server-only';
-import { and, eq, isNotNull, lte } from 'drizzle-orm';
+import { and, eq, isNotNull, isNull, lte } from 'drizzle-orm';
 import { ONBOARDING_ORDER, SOURCES, type IngestSource } from '@vivy/core';
 import { db, onboardingSteps } from '@vivy/db';
 
@@ -70,6 +70,10 @@ export async function setStep(
         status,
         scheduledFor: scheduledFor ?? null,
         completedAt: status === 'done' ? now : null,
+        // Cleared on every change, so asking to be reminded a second time
+        // actually reminds. The runner only fires rows where this is null, so
+        // leaving a stale stamp here would silently retire the reminder.
+        remindedAt: null,
         updatedAt: now,
       },
     });
@@ -107,7 +111,11 @@ export async function allDueReminders(): Promise<{ userId: string; sourceId: str
         and(
           eq(onboardingSteps.status, 'scheduled'),
           isNotNull(onboardingSteps.scheduledFor),
-          lte(onboardingSteps.scheduledFor, new Date())));
+          lte(onboardingSteps.scheduledFor, new Date()),
+          // The half that was missing. The runner stamps `remindedAt` before
+          // sending, but without this the row still matched on the next pass,
+          // so a reminder repeated every fifteen minutes until it was acted on.
+          isNull(onboardingSteps.remindedAt)));
   } catch {
     return [];
   }

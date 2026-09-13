@@ -11,6 +11,9 @@ coverage/
 .env
 .env.*
 !.env.example
+# `vercel env pull` writes whatever filename you give it, and the default
+# suggestions do not start with a dot. This catches those.
+*.local
 
 *.log
 .DS_Store
