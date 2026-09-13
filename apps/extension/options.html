@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Vivy Collector</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #16141f;
+        --muted: #6e6b85;
+        --line: #e5e2ee;
+        --accent: #4f46e5;
+      }
+      body {
+        margin: 0;
+        padding: 32px;
+        max-width: 520px;
+        font:
+          15px/1.6 ui-sans-serif,
+          system-ui,
+          sans-serif;
+        color: var(--ink);
+        background: #fbfafd;
+      }
+      h1 {
+        font-size: 22px;
+        letter-spacing: -0.02em;
+        margin: 0 0 6px;
+      }
+      p.sub {
+        color: var(--muted);
+        margin: 0 0 24px;
+        font-size: 14px;
+      }
+      label {
+        display: block;
+        font-size: 12px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin: 16px 0 5px;
+      }
+      input {
+        width: 100%;
+        padding: 9px 11px;
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        font: inherit;
+        font-size: 14px;
+        background: #fff;
+        color: var(--ink);
+      }
+      input:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 1px;
+      }
+      button {
+        margin-top: 22px;
+        padding: 9px 18px;
+        border: 0;
+        border-radius: 7px;
+        background: var(--accent);
+        color: #fff;
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      #status {
+        margin-top: 18px;
+        font-size: 13px;
+        color: var(--muted);
+        min-height: 1.6em;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Vivy Collector</h1>
+    <p class="sub">Records the site in your active tab and what you watch on YouTube.</p>
+
+    <label for="endpoint">Endpoint</label>
+    <input id="endpoint" type="url" placeholder="https://vivy.example.com" />
+
+    <label for="deviceId">Device id</label>
+    <input id="deviceId" type="text" placeholder="chrome-laptop" />
+
+    <label for="token">Pairing token</label>
+    <input id="token" type="password" placeholder="shown once when you pair" autocomplete="off" />
+
+    <button id="save" type="button">Save and sync</button>
+    <p id="status"></p>
+
+    <script type="module" src="options.js"></script>
+  </body>
+</html>

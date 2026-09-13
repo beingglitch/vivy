@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Debug builds only.
+
+  Android has blocked plaintext HTTP since API 28, which is right: a collector
+  carrying bank messages has no business talking to anything unencrypted. But a
+  dev server on your laptop is http://192.168.x.x, and there is no certificate
+  to be had for a LAN address.
+
+  So this file exists in src/debug and nowhere else. The release APK never sees
+  it and still refuses cleartext to anything, including your own network.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

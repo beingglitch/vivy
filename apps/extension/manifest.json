@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "Vivy Collector",
+  "version": "0.1.0",
+  "description": "Records what you browse and watch, and hands it to Vivy.",
+  "minimum_chrome_version": "116",
+  "permissions": ["tabs", "storage", "idle", "alarms"],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.youtube.com/*", "https://m.youtube.com/*"],
+      "js": ["content-youtube.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "options_page": "options.html",
+  "action": { "default_title": "Vivy" }
+}

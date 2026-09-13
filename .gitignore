@@ -1,0 +1,28 @@
+node_modules/
+dist/
+.next/
+out/
+build/
+.turbo/
+coverage/
+
+# Real values never go up. The template does: it holds no secret, and it is how
+# anyone (including you on a new machine) knows which variables exist.
+.env
+.env.*
+!.env.example
+
+*.log
+.DS_Store
+.vercel
+
+# Local collector state. Never commit captured data.
+*.sqlite
+*.sqlite-journal
+/data/
+apps/extension/dist/
+android/.gradle/
+android/local.properties
+
+# TypeScript incremental build cache
+*.tsbuildinfo

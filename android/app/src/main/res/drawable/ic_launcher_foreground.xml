@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  A drawn mark rather than a bitmap: one file, every density, no export step.
+  The V sits inside the 72dp safe zone of the 108dp adaptive canvas so no
+  launcher mask clips it.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M38,38 L54,70 L70,38 L62,38 L54,54 L46,38 Z" />
+</vector>

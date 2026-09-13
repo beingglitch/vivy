@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Compose paints everything, so this exists only to set the window before
+      the first frame. Without a matching background the app opens on a white
+      or black flash, depending on the system theme.
+    -->
+    <style name="Theme.Vivy" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/board</item>
+        <item name="android:statusBarColor">@color/board</item>
+        <item name="android:navigationBarColor">@color/board</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+</resources>

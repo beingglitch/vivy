@@ -1,0 +1,73 @@
+name: Android
+
+on:
+  push:
+    branches: [main]
+    # Tag a release to get an APK attached to it:
+    #   git tag android-v0.1.0 && git push --tags
+    tags: ['android-v*']
+  pull_request:
+    paths: ['android/**', '.github/workflows/android.yml']
+  workflow_dispatch:
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # Caches the Gradle distribution, the dependency cache and the build
+      # cache. Without it every run re-downloads the whole Android toolchain,
+      # which is most of the wall clock.
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Build release APK
+        run: ./gradlew assembleRelease --no-daemon
+
+      # The filename carries the version code, because that is what the app
+      # compares when it checks for an update. Keeping it in the name rather
+      # than a side file keeps a release to one artifact.
+      - name: Name the artifact after its version
+        id: name
+        run: |
+          name=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
+          code=$(grep -oP 'versionCode = \K\d+' app/build.gradle.kts)
+          echo "apk=vivy-${name}-${code}.apk" >> "$GITHUB_OUTPUT"
+          echo "version=${name}" >> "$GITHUB_OUTPUT"
+
+      - run: mv app/build/outputs/apk/release/app-release.apk "${{ steps.name.outputs.apk }}"
+
+      # Downloadable from the run page for 90 days. This is the install path:
+      # the phone opens the artifact, not a store.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: apk
+          path: android/${{ steps.name.outputs.apk }}
+          retention-days: 90
+
+      # Publishing the release is what makes the build reachable: the web app
+      # reads the latest release, serves the APK at /api/android/download, and
+      # the phone's update check compares against it.
+      - name: Publish the release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Android ${{ steps.name.outputs.version }}
+          files: android/${{ steps.name.outputs.apk }}
+          generate_release_notes: true

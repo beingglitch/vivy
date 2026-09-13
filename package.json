@@ -1,0 +1,21 @@
+{
+  "name": "vivy",
+  "private": true,
+  "packageManager": "pnpm@10.33.2",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "build": "turbo build",
+    "dev": "turbo dev",
+    "lint": "turbo lint",
+    "typecheck": "turbo typecheck",
+    "test": "turbo test",
+    "format": "prettier --write \"**/*.{ts,tsx,json,md}\"",
+    "db:generate": "pnpm --filter @vivy/db generate",
+    "db:migrate": "pnpm --filter @vivy/db migrate"
+  },
+  "devDependencies": {
+    "prettier": "^3.4.2",
+    "turbo": "^2.3.4",
+    "typescript": "^5.7.2"
+  }
+}

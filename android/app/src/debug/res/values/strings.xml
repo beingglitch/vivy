@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Both builds can be installed at once, so they must be tellable apart. -->
+    <string name="app_name">Vivy (local)</string>
+</resources>
