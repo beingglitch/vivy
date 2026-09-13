@@ -65,6 +65,15 @@ html,
 body {
   margin: 0;
   padding: 0;
+  height: 100%;
+  /* The app shell is exactly one viewport tall and scrolls inside itself. Let
+     the document scroll as well and you get two scrollbars fighting: the dock
+     slides off the bottom while the header slides off the top, which is what
+     "the page scrolls but the tab bar is cut in half" looks like. */
+  overflow: hidden;
+  /* No rubber-band past the ends, so a flick inside a list does not drag the
+     whole app. */
+  overscroll-behavior: none;
 }
 
 body {
@@ -106,16 +115,17 @@ a {
 /* ---------------------------------------------------------------- shell -- */
 
 .board {
-  min-height: 100dvh;
+  height: 100dvh;
   display: flex;
   justify-content: center;
   align-items: flex-start;
+  overflow: hidden;
 }
 
 .phone {
   width: 100%;
   max-width: 390px;
-  height: 100dvh;
+  height: 100%;
   background: var(--paper);
   display: flex;
   flex-direction: column;
@@ -137,67 +147,16 @@ a {
   }
 }
 
-.statusbar {
-  height: 52px;
-  flex: none;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 28px 0 30px;
-}
-.statusbar__time {
-  font-family: var(--font-mono);
-  font-size: 13px;
-  font-weight: 500;
-}
-.statusbar__right {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.statusbar__bars {
-  display: flex;
-  align-items: flex-end;
-  gap: 2px;
-}
-.statusbar__bars i {
-  width: 3px;
-  background: var(--ink);
-  border-radius: 1px;
-  display: block;
-}
-.statusbar__bars i:nth-child(1) {
-  height: 5px;
-}
-.statusbar__bars i:nth-child(2) {
-  height: 8px;
-}
-.statusbar__bars i:nth-child(3) {
-  height: 11px;
-}
-.statusbar__battery {
-  width: 22px;
-  height: 11px;
-  border: 1.3px solid var(--ink);
-  border-radius: 3px;
-  padding: 1.5px;
-}
-.statusbar__battery span {
-  display: block;
-  width: 70%;
-  height: 100%;
-  background: var(--ink);
-  border-radius: 1px;
-}
-
 /* Scroll region between the header and the docked composer. */
 .screen {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
-  /* Clear the composer + tab bar, which float above this. */
-  padding-bottom: 152px;
+  overscroll-behavior: contain;
+  /* Clear the composer + tab bar, which float above this, plus whatever the
+     home indicator takes. */
+  padding-bottom: calc(152px + env(safe-area-inset-bottom));
   /* A visible scrollbar breaks the illusion and steals 15px of a 390px screen. */
   scrollbar-width: none;
 }
@@ -206,12 +165,14 @@ a {
   display: none;
 }
 .screen--flush {
-  padding-bottom: 152px;
+  padding-bottom: calc(152px + env(safe-area-inset-bottom));
 }
 
 .header {
   flex: none;
-  padding: 6px 20px 14px;
+  /* The viewport is `viewport-fit=cover`, so the page extends under the
+     notch. Without this the title sits behind the system clock. */
+  padding: calc(6px + env(safe-area-inset-top)) 20px 14px;
 }
 .header__row {
   display: flex;
@@ -404,6 +365,9 @@ a {
   bottom: 0;
   background: linear-gradient(to bottom, rgba(255, 255, 255, 0) 0%, #fff 38%);
   padding-top: 30px;
+  /* Clears the home indicator. Without it the tab bar is drawn underneath the
+     gesture bar and the labels are sliced off. */
+  padding-bottom: env(safe-area-inset-bottom);
   pointer-events: none;
 }
 .dock > * {

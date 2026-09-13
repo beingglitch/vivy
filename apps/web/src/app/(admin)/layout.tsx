@@ -1,6 +1,5 @@
 import { redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
-import { StatusBar } from '@/components/shell';
 import { currentAdmin } from '@/lib/admin';
 import { hasPassphrase } from '@/lib/session';
 
@@ -19,7 +18,6 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   return (
     <div className="board">
       <div className="phone">
-        <StatusBar />
         {children}
       </div>
     </div>

@@ -1,6 +1,5 @@
 import { redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
-import { StatusBar } from '@/components/shell';
 import { ReminderBanner } from '@/components/reminder-banner';
 import { dueReminders } from '@/lib/onboarding';
 import { currentUserId, hasPassphrase } from '@/lib/session';
@@ -39,7 +38,6 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   return (
     <div className="board">
       <div className="phone">
-        <StatusBar />
         {due.length > 0 ? (
           <ReminderBanner name={due[0]!.source.name} sourceId={due[0]!.source.id} />
         ) : null}

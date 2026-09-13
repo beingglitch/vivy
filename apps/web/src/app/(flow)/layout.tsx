@@ -1,6 +1,5 @@
 import { redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
-import { StatusBar } from '@/components/shell';
 import { currentUserId } from '@/lib/session';
 
 /**
@@ -15,7 +14,6 @@ export default async function FlowLayout({ children }: { children: ReactNode }) 
   return (
     <div className="board">
       <div className="phone">
-        <StatusBar />
         {children}
       </div>
     </div>

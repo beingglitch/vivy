@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
   HomeIcon,
   MicIcon,
@@ -20,42 +20,11 @@ import {
  * slot, which is what keeps capture one thumb-reach away, the whole premise of
  * a chat-first tracker. Both float over the scroll region on a white gradient,
  * so content scrolls under them instead of being clipped by them.
+ *
+ * There is deliberately no status bar. The design canvas drew one because a
+ * mockup has to draw the whole phone, but on a real phone it is a second fake
+ * clock sitting under the real one.
  */
-
-export function StatusBar() {
-  // Rendered on the client only. A server-rendered clock hydrates into a
-  // mismatch the moment the minute rolls over between render and paint.
-  const [time, setTime] = useState<string | null>(null);
-
-  useEffect(() => {
-    const tick = () =>
-      setTime(
-        new Date().toLocaleTimeString('en-GB', {
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: false,
-        }));
-    tick();
-    const id = setInterval(tick, 30_000);
-    return () => clearInterval(id);
-  }, []);
-
-  return (
-    <div className="statusbar">
-      <span className="statusbar__time">{time ?? ' '}</span>
-      <div className="statusbar__right">
-        <div className="statusbar__bars" aria-hidden>
-          <i />
-          <i />
-          <i />
-        </div>
-        <div className="statusbar__battery" aria-hidden>
-          <span />
-        </div>
-      </div>
-    </div>
-  );
-}
 
 const TABS = [
   { href: '/', label: 'Home', Icon: HomeIcon },
