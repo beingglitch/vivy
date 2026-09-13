@@ -74,6 +74,7 @@ export type ReleaseProblem =
   | 'no-repo'
   | 'no-token'
   | 'unauthorized'
+  | 'no-access'
   | 'no-release'
   | 'no-asset'
   | 'unreachable';
@@ -89,6 +90,8 @@ export const RELEASE_PROBLEMS: Record<ReleaseProblem, string> = {
     'The repo is private, so GITHUB_TOKEN is required. Use a fine-grained token with Contents: read.',
   unauthorized:
     'GitHub refused the token. Check it has Contents: read on this repo and has not expired.',
+  'no-access':
+    'The token cannot see this repo. Check VIVY_GITHUB_REPO is right, and that the token grants Contents: read on it.',
   'no-release': 'No release published yet. Tag one: git tag android-v0.1.0 && git push --follow-tags',
   'no-asset':
     'The release has no APK named vivy-<version>-<versionCode>.apk. Check the workflow finished.',
@@ -117,7 +120,12 @@ export async function lookupAndroidRelease(): Promise<ReleaseLookup> {
       // it, so a missing token and a wrong one are told apart by whether we
       // sent one at all.
       if (response.status === 404) {
-        return { ok: false, problem: token ? 'no-release' : 'no-token' };
+        if (!token) return { ok: false, problem: 'no-token' };
+        // GitHub returns 404, never 403, for a private repo the caller cannot
+        // see. So "no release" and "wrong token" look identical here. Asking
+        // for the repo itself separates them: visible means the releases list
+        // really is empty.
+        return { ok: false, problem: (await canSeeRepo(slug, token)) ? 'no-release' : 'no-access' };
       }
       if (response.status === 401 || response.status === 403) {
         return { ok: false, problem: 'unauthorized' };
@@ -144,6 +152,23 @@ export async function lookupAndroidRelease(): Promise<ReleaseLookup> {
     };
   } catch {
     return { ok: false, problem: 'unreachable' };
+  }
+}
+
+/** Can this token see the repository at all? Used only to sharpen a 404. */
+async function canSeeRepo(slug: string, token: string): Promise<boolean> {
+  try {
+    const response = await fetch(`https://api.github.com/repos/${slug}`, {
+      headers: {
+        Accept: 'application/vnd.github+json',
+        Authorization: `Bearer ${token}`,
+        'User-Agent': 'vivy',
+      },
+      next: { revalidate: 600 },
+    });
+    return response.ok;
+  } catch {
+    return false;
   }
 }
 
