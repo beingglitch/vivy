@@ -39,5 +39,12 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|sw.js).*)'],
+  // Static assets must never be redirected. The install prompt is evaluated
+  // while signed out, so an icon that 307s to /login hands Chrome a page of
+  // HTML where it asked for a PNG, and the app silently becomes
+  // uninstallable. Anything with an image extension is excluded for the same
+  // reason.
+  matcher: [
+    '/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|sw.js|.*\\.(?:png|jpg|jpeg|gif|svg|webp|ico)$).*)',
+  ],
 };

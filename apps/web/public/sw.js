@@ -18,6 +18,20 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(self.clients.claim());
 });
 
+/**
+ * Chrome will not offer to install a site whose service worker has no fetch
+ * handler. It does not have to cache anything, it has to exist, which is the
+ * browser's way of checking the app has thought about being offline at all.
+ *
+ * Deliberately pass-through. Vivy's screens are server rendered and per user,
+ * so a cache-first strategy here would serve one account's numbers to whoever
+ * opened the app next. Caching belongs behind the sync layer, not in front of
+ * the HTML.
+ */
+self.addEventListener('fetch', () => {
+  // Left to the network on purpose. See above.
+});
+
 self.addEventListener('push', (event) => {
   let payload = {};
   try {
