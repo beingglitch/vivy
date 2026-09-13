@@ -1,4 +1,4 @@
-import { latestAndroidRelease } from '@/lib/releases';
+import { lookupAndroidRelease, RELEASE_PROBLEMS } from '@/lib/releases';
 import { fail, handleError, ok } from '@/lib/http';
 
 export const dynamic = 'force-dynamic';
@@ -7,18 +7,23 @@ export const runtime = 'nodejs';
 /**
  * GET /api/android/latest - what the newest build is.
  *
- * Deliberately unauthenticated. It returns a version number and a public
- * GitHub link, which is not information worth protecting, and requiring a
- * device token would mean an unpaired phone could never discover an update.
+ * Unauthenticated on purpose: it returns a version number, which is not worth
+ * protecting, and requiring a device token would mean a phone that is not
+ * signed in could never discover an update.
+ *
+ * The 404 carries a `problem` naming which of the several causes it is. They
+ * are indistinguishable from outside otherwise, and each has a different fix.
  */
 export async function GET() {
   try {
-    const release = await latestAndroidRelease();
-    if (!release) return fail('No published build yet.', 404);
+    const result = await lookupAndroidRelease();
+    if (!result.ok) {
+      return fail(RELEASE_PROBLEMS[result.problem], 404, { problem: result.problem });
+    }
 
-    // The asset's API url is deliberately not sent. The phone downloads through
-    // /api/android/download, so the only thing it needs to know is the version.
-    const { assetApiUrl: _assetApiUrl, ...publicFields } = release;
+    // The asset's API url is deliberately withheld. The phone downloads through
+    // /api/android/download, so all it needs from here is the version.
+    const { assetApiUrl: _assetApiUrl, ...publicFields } = result.release;
     return ok(publicFields);
   } catch (error) {
     return handleError(error);

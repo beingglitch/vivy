@@ -6,7 +6,7 @@ import { isAdminEmail } from '@/lib/admin-emails';
 import { LoginMethodPicker } from './picker';
 import { signOut } from './actions';
 import { PassphrasePanel } from './passphrase-panel';
-import { latestAndroidRelease } from '@/lib/releases';
+import { lookupAndroidRelease } from '@/lib/releases';
 import { listDevices } from '@/lib/devices';
 import { AndroidApp } from './android-app';
 
@@ -20,7 +20,8 @@ export default async function SettingsPage() {
   const preferred = await preferredLoginOf(userId);
   const hasOne = await hasPassphrase(userId);
   const admin = user ? isAdminEmail(user.email) : false;
-  const release = await latestAndroidRelease();
+  const lookup = await lookupAndroidRelease();
+  const release = lookup.ok ? lookup.release : null;
   const phones = await listDevices(userId, 'android');
 
   // The address the browser actually used, so the QR points somewhere reachable
@@ -77,7 +78,12 @@ export default async function SettingsPage() {
           </p>
         </section>
 
-        <AndroidApp release={release} origin={`${proto}://${host}`} phones={phones} />
+        <AndroidApp
+          release={release}
+          origin={`${proto}://${host}`}
+          phones={phones}
+          problem={lookup.ok ? undefined : lookup.problem}
+        />
 
         <section className="src__section">
           <span className="eyebrow">Session</span>

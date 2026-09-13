@@ -1,5 +1,5 @@
 import type { PairedDevice } from '@/lib/devices';
-import type { AndroidRelease } from '@/lib/releases';
+import { RELEASE_PROBLEMS, type AndroidRelease, type ReleaseProblem } from '@/lib/releases';
 
 /**
  * Get the app onto the phone.
@@ -12,10 +12,12 @@ export function AndroidApp({
   release,
   origin,
   phones,
+  problem,
 }: {
   release: AndroidRelease | null;
   origin: string;
   phones: PairedDevice[];
+  problem?: ReleaseProblem | undefined;
 }) {
   // A phone that has never reported a version is not out of date, it is
   // unknown. Treating the two the same would nag about a build that is fine.
@@ -27,13 +29,11 @@ export function AndroidApp({
       <section className="src__section">
         <span className="eyebrow">Android app</span>
         <p className="src__controlNote">
-          No build published yet. Tag one to create it:
+          {problem ? RELEASE_PROBLEMS[problem] : 'No build available yet.'}
         </p>
-        <code className="ob__cmd">git tag android-v0.1.0 &amp;&amp; git push --tags</code>
-        <p className="src__controlNote">
-          The build runs on GitHub Actions and appears here when it finishes, usually within a few
-          minutes.
-        </p>
+        {problem === 'no-release' ? (
+          <code className="ob__cmd">git tag android-v0.1.0 &amp;&amp; git push --follow-tags</code>
+        ) : null}
       </section>
     );
   }

@@ -63,46 +63,94 @@ function parseAsset(assets: GhAsset[]): { asset: GhAsset; versionCode: number } 
   return null;
 }
 
-export async function latestAndroidRelease(): Promise<AndroidRelease | null> {
-  const slug = repo();
-  if (!slug) return null;
+/**
+ * Why there is no build to offer.
+ *
+ * One 404 for four different causes is a bad afternoon: unset variable, wrong
+ * token, no release, wrong filename all look identical from outside. Each one
+ * has a different fix, so each gets its own name.
+ */
+export type ReleaseProblem =
+  | 'no-repo'
+  | 'no-token'
+  | 'unauthorized'
+  | 'no-release'
+  | 'no-asset'
+  | 'unreachable';
 
+export type ReleaseLookup =
+  | { ok: true; release: AndroidRelease }
+  | { ok: false; problem: ReleaseProblem };
+
+/** What each problem means, in words meant for the person who has to fix it. */
+export const RELEASE_PROBLEMS: Record<ReleaseProblem, string> = {
+  'no-repo': 'Set VIVY_GITHUB_REPO to owner/repo, then redeploy.',
+  'no-token':
+    'The repo is private, so GITHUB_TOKEN is required. Use a fine-grained token with Contents: read.',
+  unauthorized:
+    'GitHub refused the token. Check it has Contents: read on this repo and has not expired.',
+  'no-release': 'No release published yet. Tag one: git tag android-v0.1.0 && git push --follow-tags',
+  'no-asset':
+    'The release has no APK named vivy-<version>-<versionCode>.apk. Check the workflow finished.',
+  unreachable: 'Could not reach GitHub. It may be a transient outage.',
+};
+
+export async function lookupAndroidRelease(): Promise<ReleaseLookup> {
+  const slug = repo();
+  if (!slug) return { ok: false, problem: 'no-repo' };
+
+  const token = process.env['GITHUB_TOKEN'];
   const headers: Record<string, string> = {
     Accept: 'application/vnd.github+json',
     'User-Agent': 'vivy',
   };
-  // Optional. Unauthenticated is 60 requests an hour per IP, which the cache
-  // below keeps us well inside; a token only matters for a private repo.
-  const token = process.env['GITHUB_TOKEN'];
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
   try {
     const response = await fetch(`https://api.github.com/repos/${slug}/releases/latest`, {
       headers,
-      // Ten minutes. The phone polls this, and a release is not urgent enough
-      // to spend the rate limit on freshness.
       next: { revalidate: 600 },
     });
-    if (!response.ok) return null;
+
+    if (!response.ok) {
+      // A private repo answers 404 rather than 403 to anyone who cannot see
+      // it, so a missing token and a wrong one are told apart by whether we
+      // sent one at all.
+      if (response.status === 404) {
+        return { ok: false, problem: token ? 'no-release' : 'no-token' };
+      }
+      if (response.status === 401 || response.status === 403) {
+        return { ok: false, problem: 'unauthorized' };
+      }
+      return { ok: false, problem: 'unreachable' };
+    }
 
     const release = (await response.json()) as GhRelease;
-    if (release.draft) return null;
+    if (release.draft) return { ok: false, problem: 'no-release' };
 
     const found = parseAsset(release.assets);
-    if (!found) return null;
+    if (!found) return { ok: false, problem: 'no-asset' };
 
     return {
-      versionName: release.tag_name.replace(/^android-v?/, ''),
-      versionCode: found.versionCode,
-      assetApiUrl: found.asset.url,
-      sizeBytes: found.asset.size,
-      publishedAt: release.published_at,
-      notes: release.body?.trim() ?? '',
+      ok: true,
+      release: {
+        versionName: release.tag_name.replace(/^android-v?/, ''),
+        versionCode: found.versionCode,
+        assetApiUrl: found.asset.url,
+        sizeBytes: found.asset.size,
+        publishedAt: release.published_at,
+        notes: release.body?.trim() ?? '',
+      },
     };
   } catch {
-    // A release feed that is down must never take a page with it.
-    return null;
+    return { ok: false, problem: 'unreachable' };
   }
+}
+
+/** The common case, for callers that only care whether there is a build. */
+export async function latestAndroidRelease(): Promise<AndroidRelease | null> {
+  const result = await lookupAndroidRelease();
+  return result.ok ? result.release : null;
 }
 
 /**
