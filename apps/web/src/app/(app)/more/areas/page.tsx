@@ -1,6 +1,6 @@
 import { Dock } from '@/components/shell';
 import { listAreas } from '@/lib/areas';
-import { requireUserId } from '@/lib/session';
+import { requirePageUserId } from '@/lib/page-session';
 import { AreasScreen } from './areas-screen';
 
 export const dynamic = 'force-dynamic';
@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic';
  * something has gone quiet rather than just listing what is left.
  */
 export default async function AreasPage() {
-  const areas = await listAreas(await requireUserId());
+  const areas = await listAreas(await requirePageUserId());
 
   return (
     <>

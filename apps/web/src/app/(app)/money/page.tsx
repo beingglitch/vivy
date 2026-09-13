@@ -2,7 +2,7 @@ import { count, eq } from 'drizzle-orm';
 import { Empty } from '@/components/empty';
 import { Dock } from '@/components/shell';
 import { db, txns } from '@vivy/db';
-import { requireUserId } from '@/lib/session';
+import { requirePageUserId } from '@/lib/page-session';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,7 +16,7 @@ export const dynamic = 'force-dynamic';
  * "nothing connected" is the truth.
  */
 export default async function MoneyPage() {
-  const userId = await requireUserId();
+  const userId = await requirePageUserId();
 
   let total = 0;
   try {

@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useRef, useState, useTransition } from 'react';
 import type { Area } from '@/lib/areas';
 import type { Task } from '@/lib/tasks';
 import { EFFORTS, IMPORTANCE, unplace } from '@/lib/task-scales';
 import { PlusIcon } from '@/components/icons';
-import { completeTask, removeTask } from './actions';
+import { archiveTask, completeTask, removeTask } from './actions';
 import { TaskForm } from './task-form';
 
 /**
@@ -20,7 +20,7 @@ export function QuadrantScreen({ tasks, areas }: { tasks: Task[]; areas: Area[] 
   // closed; the centre is used when it is opened from the header button
   // instead, because that gesture says nothing about placement.
   const [draft, setDraft] = useState<{ importance: number; effortMinutes: number } | null>(null);
-  const [selected, setSelected] = useState<Task | null>(null);
+  const [editing, setEditing] = useState<Task | null>(null);
 
   /**
    * Tapping the grid says both numbers at once.
@@ -36,7 +36,6 @@ export function QuadrantScreen({ tasks, areas }: { tasks: Task[]; areas: Area[] 
     const box = event.currentTarget.getBoundingClientRect();
     const x = ((event.clientX - box.left) / box.width) * 100;
     const y = ((event.clientY - box.top) / box.height) * 100;
-    setSelected(null);
     setDraft(unplace(x, y));
   }
 
@@ -56,7 +55,6 @@ export function QuadrantScreen({ tasks, areas }: { tasks: Task[]; areas: Area[] 
             className="iconbtn"
             aria-label={draft ? 'Cancel' : 'New task'}
             onClick={() => {
-              setSelected(null);
               // Middle of the board, since the button says nothing about where.
               setDraft(draft ? null : { importance: 2, effortMinutes: 30 });
             }}
@@ -78,20 +76,13 @@ export function QuadrantScreen({ tasks, areas }: { tasks: Task[]; areas: Area[] 
             <div className="quadrant__hline" />
 
             {tasks.map((task) => (
-              <button
+              <TaskDot
                 key={task.id}
-                className="quadrant__task"
-                style={{
-                  left: `${task.x}%`,
-                  top: `${task.y}%`,
-                  width: task.size,
-                  height: task.size,
-                  background: task.areaColour ?? '#8A8A90',
-                  outline: selected?.id === task.id ? '2px solid var(--ink)' : 'none',
-                  outlineOffset: 2,
+                task={task}
+                onEdit={() => {
+                  setDraft(null);
+                  setEditing(task);
                 }}
-                aria-label={`${task.title}. ${importanceLabel(task.importance)}, ${effortLabel(task.effortMinutes)}`}
-                onClick={() => setSelected(selected?.id === task.id ? null : task)}
               />
             ))}
           </div>
@@ -100,18 +91,14 @@ export function QuadrantScreen({ tasks, areas }: { tasks: Task[]; areas: Area[] 
         <div className="axis-x">
           <span>5 min</span>
           <span className="axis-x__label">Time to finish</span>
-          <span>4 h +</span>
+          <span>24 h</span>
         </div>
 
-        {selected ? (
-          <TaskCard task={selected} onClose={() => setSelected(null)} />
-        ) : (
-          <p className="quadrant__note">
-            {tasks.length === 0
-              ? 'Tap anywhere on the grid to add a task there. Left is quick, top is important.'
-              : 'Tap a dot to open it, or an empty spot to add a task there.'}
-          </p>
-        )}
+        <p className="quadrant__note">
+          {tasks.length === 0
+            ? 'Tap anywhere on the grid to add a task there. Left is quick, top is important.'
+            : 'Tap a task to finish it. Hold it to edit, or use the list to swipe.'}
+        </p>
 
         {draft ? (
           <TaskForm
@@ -122,11 +109,27 @@ export function QuadrantScreen({ tasks, areas }: { tasks: Task[]; areas: Area[] 
           />
         ) : null}
 
+        {editing ? (
+          <TaskForm
+            areas={areas}
+            importance={editing.importance}
+            effortMinutes={editing.effortMinutes}
+            task={editing}
+            onDone={() => setEditing(null)}
+          />
+        ) : null}
+
         {tasks.length > 0 ? (
           <ul className="qlist">
             {tasks.map((task) => (
               <li key={task.id}>
-                <TaskRow task={task} onSelect={() => setSelected(task)} />
+                <TaskRow
+                  task={task}
+                  onEdit={() => {
+                    setDraft(null);
+                    setEditing(task);
+                  }}
+                />
               </li>
             ))}
           </ul>
@@ -136,18 +139,102 @@ export function QuadrantScreen({ tasks, areas }: { tasks: Task[]; areas: Area[] 
   );
 }
 
-function TaskRow({ task, onSelect }: { task: Task; onSelect: () => void }) {
+function TaskDot({ task, onEdit }: { task: Task; onEdit: () => void }) {
   const [pending, start] = useTransition();
+  const hold = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const held = useRef(false);
 
   return (
-    <div className="task">
-      <button
-        className="task__box"
-        aria-label={`Complete ${task.title}`}
-        disabled={pending}
-        onClick={() => start(() => void completeTask(task.id))}
-      />
-      <button className="task__body" onClick={onSelect}>
+    <button
+      className="quadrant__task"
+      style={{
+        left: `${task.x}%`,
+        top: `${task.y}%`,
+        width: task.size,
+        height: task.size,
+        background: task.areaColour ?? '#8A8A90',
+      }}
+      aria-label={`${task.title}. Tap to complete or press and hold to edit.`}
+      disabled={pending}
+      onPointerDown={() => {
+        held.current = false;
+        hold.current = setTimeout(() => {
+          held.current = true;
+          navigator.vibrate?.(30);
+          onEdit();
+        }, 550);
+      }}
+      onPointerUp={() => hold.current && clearTimeout(hold.current)}
+      onPointerCancel={() => hold.current && clearTimeout(hold.current)}
+      onClick={() => {
+        if (held.current) {
+          held.current = false;
+          return;
+        }
+        start(() => void completeTask(task.id));
+      }}
+    />
+  );
+}
+
+function TaskRow({ task, onEdit }: { task: Task; onEdit: () => void }) {
+  const [pending, start] = useTransition();
+  const gesture = useRef<{ x: number; held: boolean; timer: ReturnType<typeof setTimeout> } | null>(
+    null,
+  );
+
+  function finishGesture(event: React.PointerEvent<HTMLDivElement>) {
+    const active = gesture.current;
+    if (!active) return;
+    clearTimeout(active.timer);
+    gesture.current = null;
+    if (active.held || pending) return;
+
+    const distance = event.clientX - active.x;
+    if (distance >= 72) return start(() => void archiveTask(task.id));
+    if (distance <= -72) return start(() => void removeTask(task.id));
+    start(() => void completeTask(task.id));
+  }
+
+  return (
+    <div
+      className="task task--gesture"
+      role="button"
+      tabIndex={0}
+      aria-label={`${task.title}. Tap to complete, swipe right to archive, swipe left to delete, or press and hold to edit.`}
+      onPointerDown={(event) => {
+        if (pending) return;
+        gesture.current = {
+          x: event.clientX,
+          held: false,
+          timer: setTimeout(() => {
+            if (!gesture.current) return;
+            gesture.current.held = true;
+            navigator.vibrate?.(30);
+            onEdit();
+          }, 550),
+        };
+      }}
+      onPointerMove={(event) => {
+        if (!gesture.current) return;
+        if (Math.abs(event.clientX - gesture.current.x) > 10) {
+          clearTimeout(gesture.current.timer);
+        }
+      }}
+      onPointerUp={finishGesture}
+      onPointerCancel={() => {
+        if (gesture.current) clearTimeout(gesture.current.timer);
+        gesture.current = null;
+      }}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          start(() => void completeTask(task.id));
+        }
+      }}
+    >
+      <span className="task__box" aria-hidden />
+      <div className="task__body">
         <span className="task__title">
           {task.title}
           {task.behind ? <span className="behind">behind</span> : null}
@@ -158,53 +245,6 @@ function TaskRow({ task, onSelect }: { task: Task; onSelect: () => void }) {
           {task.dueAt ? ` · due ${new Date(task.dueAt).toLocaleDateString('en-GB')}` : ''}
           {task.placeLabel ? ` · ${task.placeLabel}` : ''}
         </span>
-      </button>
-    </div>
-  );
-}
-
-function TaskCard({ task, onClose }: { task: Task; onClose: () => void }) {
-  const [pending, start] = useTransition();
-
-  return (
-    <div className="qcard">
-      <div className="qcard__head">
-        <span className="dot" style={{ background: task.areaColour ?? '#8A8A90' }} />
-        <span className="qcard__title">{task.title}</span>
-      </div>
-      <p className="qcard__meta">
-        {task.areaName ?? 'Unfiled'} · {importanceLabel(task.importance)} ·{' '}
-        {effortLabel(task.effortMinutes)}
-        {task.dueAt ? ` · due ${new Date(task.dueAt).toLocaleDateString('en-GB')}` : ''}
-      </p>
-      <div className="qcard__actions">
-        <button
-          className="btn btn--primary"
-          disabled={pending}
-          onClick={() =>
-            start(async () => {
-              await completeTask(task.id);
-              onClose();
-            })
-          }
-        >
-          Done
-        </button>
-        <button
-          className="btn btn--quiet"
-          disabled={pending}
-          onClick={() =>
-            start(async () => {
-              await removeTask(task.id);
-              onClose();
-            })
-          }
-        >
-          Delete
-        </button>
-        <button className="btn btn--quiet" onClick={onClose}>
-          Close
-        </button>
       </div>
     </div>
   );

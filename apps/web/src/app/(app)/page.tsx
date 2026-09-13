@@ -1,7 +1,7 @@
 import { Empty } from '@/components/empty';
 import { MenuIcon, PlusIcon } from '@/components/icons';
 import { Dock } from '@/components/shell';
-import { requireUserId } from '@/lib/session';
+import { requirePageUserId } from '@/lib/page-session';
 import { hasAnyData, loadStreams } from '@/lib/streams-data';
 import { StreamsScreen } from './streams-screen';
 
@@ -15,7 +15,7 @@ export const dynamic = 'force-dynamic';
  * instead would mean every number on the opening screen was fiction.
  */
 export default async function HomePage() {
-  const streams = await loadStreams(await requireUserId());
+  const streams = await loadStreams(await requirePageUserId());
   const today = new Date().toLocaleDateString('en-GB', {
     weekday: 'long',
     day: 'numeric',

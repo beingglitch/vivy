@@ -5,20 +5,11 @@ import { AREA_COLOURS } from '@/lib/area-colours';
 import type { Area } from '@/lib/areas';
 import { PlusIcon } from '@/components/icons';
 import { Empty } from '@/components/empty';
-import { addArea, editArea, removeArea } from './actions';
-
-/** Common rhythms, so the usual case is one tap rather than typing a number. */
-const CADENCES = [
-  { value: null, label: 'No cadence' },
-  { value: 1, label: 'Daily' },
-  { value: 3, label: 'Every 3 days' },
-  { value: 7, label: 'Weekly' },
-  { value: 14, label: 'Fortnightly' },
-  { value: 30, label: 'Monthly' },
-] as const;
+import { addArea, deleteArea, editArea, removeArea } from './actions';
 
 export function AreasScreen({ areas }: { areas: Area[] }) {
   const [adding, setAdding] = useState(false);
+  const usedColours = areas.map((area) => area.colour);
 
   return (
     <>
@@ -43,17 +34,21 @@ export function AreasScreen({ areas }: { areas: Area[] }) {
       </div>
 
       <div className="screen">
-        {adding ? <AreaForm onDone={() => setAdding(false)} /> : null}
+        {adding ? <AreaForm usedColours={usedColours} onDone={() => setAdding(false)} /> : null}
 
         {areas.length === 0 && !adding ? (
           <Empty
             title="No focus areas"
-            hint="Areas group your work and give each one a cadence, so Vivy can tell when something has gone cold."
+            hint="Areas group related work, so your tasks stay easy to scan."
           />
         ) : (
           <ul className="arealist">
             {areas.map((area) => (
-              <AreaRow key={area.id} area={area} />
+              <AreaRow
+                key={area.id}
+                area={area}
+                usedColours={usedColours.filter((colour) => colour !== area.colour)}
+              />
             ))}
           </ul>
         )}
@@ -62,44 +57,60 @@ export function AreasScreen({ areas }: { areas: Area[] }) {
   );
 }
 
-function AreaRow({ area }: { area: Area }) {
+function AreaRow({ area, usedColours }: { area: Area; usedColours: string[] }) {
   const [open, setOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
+
+  function archive() {
+    setError(null);
+    start(async () => {
+      const result = await removeArea(area.id);
+      if (!result.ok) setError(result.error);
+    });
+  }
+
+  function deletePermanently() {
+    if (!window.confirm(`Delete “${area.name}”? Its tasks will become unfiled.`)) return;
+    setError(null);
+    start(async () => {
+      const result = await deleteArea(area.id);
+      if (!result.ok) setError(result.error);
+    });
+  }
 
   return (
     <li className="arearow">
       <button className="arearow__head" onClick={() => setOpen((v) => !v)}>
         <span className="dot" style={{ background: area.colour }} />
         <span className="arearow__name">{area.name}</span>
-        {area.cold ? <span className="arearow__cold">cold</span> : null}
         <span className="arearow__count">
           {area.openTasks === 0 ? 'nothing open' : `${area.openTasks} open`}
         </span>
       </button>
 
-      <p className="arearow__meta">
-        {area.cadenceDays === null
-          ? 'No cadence set'
-          : `Every ${area.cadenceDays} day${area.cadenceDays === 1 ? '' : 's'}`}
-        {area.lastDoneDaysAgo === null
-          ? ' · nothing finished yet'
-          : area.lastDoneDaysAgo === 0
-            ? ' · last finished today'
-            : ` · last finished ${area.lastDoneDaysAgo}d ago`}
-      </p>
-
       {open ? (
         <div className="arearow__panel">
-          <AreaForm area={area} onDone={() => setOpen(false)} />
+          <AreaForm area={area} usedColours={usedColours} onDone={() => setOpen(false)} />
           <button
+            type="button"
             className="btn btn--quiet"
             disabled={pending}
-            onClick={() => start(() => void removeArea(area.id))}
+            onClick={archive}
           >
             Archive this area
           </button>
+          <button
+            type="button"
+            className="btn btn--quiet btn--danger"
+            disabled={pending}
+            onClick={deletePermanently}
+          >
+            Delete permanently
+          </button>
+          {error ? <p className="pair__error">{error}</p> : null}
           <p className="src__controlNote">
-            Archiving hides it. Tasks filed here keep their colour and name.
+            Archiving keeps the area. Deleting it keeps its tasks as unfiled.
           </p>
         </div>
       ) : null}
@@ -107,10 +118,19 @@ function AreaRow({ area }: { area: Area }) {
   );
 }
 
-function AreaForm({ area, onDone }: { area?: Area; onDone: () => void }) {
+function AreaForm({
+  area,
+  usedColours,
+  onDone,
+}: {
+  area?: Area;
+  usedColours: string[];
+  onDone: () => void;
+}) {
   const [name, setName] = useState(area?.name ?? '');
-  const [colour, setColour] = useState<string>(area?.colour ?? AREA_COLOURS[0]);
-  const [cadence, setCadence] = useState<number | null>(area?.cadenceDays ?? null);
+  const [colour, setColour] = useState<string>(
+    area?.colour ?? AREA_COLOURS.find((option) => !usedColours.includes(option)) ?? AREA_COLOURS[0],
+  );
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
@@ -118,8 +138,8 @@ function AreaForm({ area, onDone }: { area?: Area; onDone: () => void }) {
     setError(null);
     start(async () => {
       const result = area
-        ? await editArea(area.id, { name, colour, cadenceDays: cadence })
-        : await addArea(name, colour, cadence);
+        ? await editArea(area.id, { name, colour })
+        : await addArea(name, colour);
       if (!result.ok) return setError(result.error);
       onDone();
     });
@@ -143,8 +163,9 @@ function AreaForm({ area, onDone }: { area?: Area; onDone: () => void }) {
 
       <span className="field__label">Colour</span>
       <div className="swatches">
-        {AREA_COLOURS.map((c) => (
+        {AREA_COLOURS.filter((colourOption) => !usedColours.includes(colourOption)).map((c) => (
           <button
+            type="button"
             key={c}
             className={`swatch${c === colour ? ' swatch--on' : ''}`}
             style={{ background: c }}
@@ -154,28 +175,23 @@ function AreaForm({ area, onDone }: { area?: Area; onDone: () => void }) {
           />
         ))}
       </div>
-
-      <span className="field__label">Cadence</span>
-      <div className="chips">
-        {CADENCES.map((c) => (
-          <button
-            key={String(c.value)}
-            className={`chip${c.value === cadence ? ' chip--on' : ''}`}
-            onClick={() => setCadence(c.value)}
-          >
-            {c.label}
-          </button>
-        ))}
-      </div>
+      {!area && usedColours.length >= AREA_COLOURS.length ? (
+        <p className="formhint">Archive an area to free a colour before adding another.</p>
+      ) : null}
 
       {error ? <p className="pair__error">{error}</p> : null}
 
       <div className="areaform__actions">
-        <button className="btn btn--primary" disabled={pending || !name.trim()} onClick={save}>
-          {pending ? 'Saving…' : area ? 'Save' : 'Add area'}
-        </button>
-        <button className="btn btn--quiet" disabled={pending} onClick={onDone}>
+        <button type="button" className="btn btn--quiet" disabled={pending} onClick={onDone}>
           Cancel
+        </button>
+        <button
+          type="button"
+          className="btn btn--primary"
+          disabled={pending || !name.trim() || usedColours.includes(colour)}
+          onClick={save}
+        >
+          {pending ? 'Saving…' : area ? 'Save' : 'Add area'}
         </button>
       </div>
     </div>

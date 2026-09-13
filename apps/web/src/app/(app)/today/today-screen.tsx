@@ -1,10 +1,13 @@
 'use client';
 
-import { useTransition } from 'react';
+import { useRef, useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
+import type { Area } from '@/lib/areas';
 import type { Task } from '@/lib/tasks';
 import { Empty } from '@/components/empty';
 import { CheckIcon } from '@/components/icons';
 import { addTask, completeTask, reopenTask } from '@/app/(app)/quadrant/actions';
+import { TaskForm } from '@/app/(app)/quadrant/task-form';
 import { Composer, TabBar } from '@/components/shell';
 
 /**
@@ -13,13 +16,27 @@ import { Composer, TabBar } from '@/components/shell';
  * Grouped by area, because that is how the day actually divides. Anything with
  * no area falls into one group at the end rather than being hidden.
  */
-export function TodayScreen({ open, done }: { open: Task[]; done: Task[] }) {
-  if (open.length === 0 && done.length === 0) {
-    return (
-      <Empty title="Nothing planned" hint="Tasks you add will show here, grouped by focus area." />
-    );
-  }
+export function TodayScreen({
+  open,
+  done,
+  areas,
+  day,
+}: {
+  open: Task[];
+  done: Task[];
+  areas: Area[];
+  day: string;
+}) {
+  const [editing, setEditing] = useState<Task | null>(null);
+  const router = useRouter();
+  const swipe = useRef<number | null>(null);
 
+  function moveDay(distance: number) {
+    if (Math.abs(distance) < 72) return;
+    const next = new Date(`${day}T12:00:00`);
+    next.setDate(next.getDate() + (distance < 0 ? 1 : -1));
+    router.push(`/today?day=${next.toLocaleDateString('en-CA')}`);
+  }
   const groups = new Map<string, { name: string; colour: string; tasks: Task[] }>();
   for (const task of open) {
     const key = task.areaId ?? 'unfiled';
@@ -33,7 +50,22 @@ export function TodayScreen({ open, done }: { open: Task[]; done: Task[] }) {
   }
 
   return (
-    <div className="todaylist">
+    <div
+      className="todaylist todaylist--swipe"
+      onPointerDown={(event) => {
+        swipe.current = event.clientX;
+      }}
+      onPointerUp={(event) => {
+        if (swipe.current !== null) moveDay(event.clientX - swipe.current);
+        swipe.current = null;
+      }}
+      onPointerCancel={() => {
+        swipe.current = null;
+      }}
+    >
+      {open.length === 0 && done.length === 0 ? (
+        <Empty title="Nothing planned" hint="Swipe to another day or add a task." />
+      ) : null}
       {[...groups.values()].map((group) => (
         <section key={group.name} className="todaygroup">
           <span className="todaygroup__head">
@@ -41,7 +73,7 @@ export function TodayScreen({ open, done }: { open: Task[]; done: Task[] }) {
             {group.name}
           </span>
           {group.tasks.map((task) => (
-            <Row key={task.id} task={task} done={false} />
+            <Row key={task.id} task={task} done={false} onEdit={() => setEditing(task)} />
           ))}
         </section>
       ))}
@@ -50,42 +82,97 @@ export function TodayScreen({ open, done }: { open: Task[]; done: Task[] }) {
         <section className="todaygroup">
           <span className="todaygroup__head">Done</span>
           {done.map((task) => (
-            <Row key={task.id} task={task} done />
+            <Row key={task.id} task={task} done onEdit={() => setEditing(task)} />
           ))}
         </section>
+      ) : null}
+      {editing ? (
+        <TaskForm
+          areas={areas}
+          importance={editing.importance}
+          effortMinutes={editing.effortMinutes}
+          task={editing}
+          onDone={() => setEditing(null)}
+        />
       ) : null}
     </div>
   );
 }
 
-function Row({ task, done }: { task: Task; done: boolean }) {
+function Row({ task, done, onEdit }: { task: Task; done: boolean; onEdit: () => void }) {
   const [pending, start] = useTransition();
+  const gesture = useRef<{ x: number; held: boolean; timer: ReturnType<typeof setTimeout> } | null>(
+    null,
+  );
+
+  function finishGesture(event: React.PointerEvent<HTMLDivElement>) {
+    const active = gesture.current;
+    if (!active) return;
+    clearTimeout(active.timer);
+    gesture.current = null;
+    if (active.held || pending) return;
+
+    const distance = event.clientX - active.x;
+    if (Math.abs(distance) >= 10) return;
+    start(() => void (done ? reopenTask(task.id) : completeTask(task.id)));
+  }
 
   return (
-    <div className="task">
-      <button
-        className={`task__box${done ? ' task__box--done' : ''}`}
-        aria-label={done ? `Reopen ${task.title}` : `Complete ${task.title}`}
-        disabled={pending}
-        onClick={() =>
-          start(() => void (done ? reopenTask(task.id) : completeTask(task.id)))
+    <div
+      className="task task--gesture"
+      role="button"
+      tabIndex={0}
+      aria-label={`${task.title}. Tap to ${done ? 'reopen' : 'complete'} or press and hold to edit.`}
+      onPointerDown={(event) => {
+        if (pending) return;
+        gesture.current = {
+          x: event.clientX,
+          held: false,
+          timer: setTimeout(() => {
+            if (!gesture.current) return;
+            gesture.current.held = true;
+            navigator.vibrate?.(30);
+            onEdit();
+          }, 550),
+        };
+      }}
+      onPointerMove={(event) => {
+        if (!gesture.current) return;
+        if (Math.abs(event.clientX - gesture.current.x) > 10) clearTimeout(gesture.current.timer);
+      }}
+      onPointerUp={finishGesture}
+      onPointerCancel={() => {
+        if (gesture.current) clearTimeout(gesture.current.timer);
+        gesture.current = null;
+      }}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          start(() => void (done ? reopenTask(task.id) : completeTask(task.id)));
         }
-      >
+      }}
+    >
+      <span className={`task__box${done ? ' task__box--done' : ''}`} aria-hidden>
         {done ? <CheckIcon /> : null}
-      </button>
+      </span>
       <div className="task__body">
         <span className={`task__title${done ? ' task__title--done' : ''}`}>{task.title}</span>
         {!done ? (
           <span className="task__meta">
-            {task.effortMinutes < 60
-              ? `${task.effortMinutes} min`
-              : `${task.effortMinutes / 60} h`}
+            {formatEffort(task.effortMinutes)}
             {task.dueAt ? ` · due ${new Date(task.dueAt).toLocaleDateString('en-GB')}` : ''}
           </span>
         ) : null}
       </div>
     </div>
   );
+}
+
+function formatEffort(minutes: number): string {
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  return remainder === 0 ? `${hours} h` : `${hours} h ${remainder} min`;
 }
 
 /**

@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { loadSteps, nextPending, progress } from '@/lib/onboarding';
-import { hasPassphrase, requireUserId } from '@/lib/session';
+import { requirePageUserId } from '@/lib/page-session';
+import { hasPassphrase } from '@/lib/session';
 import { currentAdmin } from '@/lib/admin';
 import { accessFor } from '@/lib/access';
 import { StepCard } from './step-card';
@@ -24,7 +25,7 @@ export default async function OnboardingPage({
   searchParams: Promise<{ intro?: string }>;
 }) {
   const { intro } = await searchParams;
-  const userId = await requireUserId();
+  const userId = await requirePageUserId();
   if (!(await hasPassphrase(userId))) redirect('/set-passphrase');
   // Onboarding connects collectors to a person's devices. An admin has none.
   if (await currentAdmin()) redirect('/admin');

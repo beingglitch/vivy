@@ -1,16 +1,66 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import type { Area } from '@/lib/areas';
+import type { Task } from '@/lib/tasks';
 import {
   DEADLINE_KINDS,
-  DUE_PERIODS,
-  EFFORTS,
   IMPORTANCE,
-  RADII,
+  MAX_EFFORT_MINUTES,
+  MIN_EFFORT_MINUTES,
   addPeriodTo,
+  type DeadlineKind,
 } from '@/lib/task-scales';
-import { addTask } from './actions';
+import { addTask, editTask } from './actions';
+import { LocationPicker, type PickedPlace } from './location-picker';
+
+type DeadlineOption = (typeof DEADLINE_KINDS)[number];
+type DueMode = 'tomorrow' | 'date' | 'relative';
+
+const DEADLINE_ORDER_KEY = 'vivy.deadline-order';
+
+function loadDeadlineOrder(): DeadlineOption[] {
+  if (typeof window === 'undefined') return [...DEADLINE_KINDS];
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(DEADLINE_ORDER_KEY) ?? '[]') as string[];
+    const ordered = saved
+      .filter((value, index) => saved.indexOf(value) === index)
+      .flatMap((value) => {
+        const option = DEADLINE_KINDS.find((candidate) => candidate.value === value);
+        return option ? [option] : [];
+      });
+    return [
+      ...ordered,
+      ...DEADLINE_KINDS.filter(
+        (option) => !ordered.some((candidate) => candidate.value === option.value),
+      ),
+    ];
+  } catch {
+    return [...DEADLINE_KINDS];
+  }
+}
+
+function formatEffort(minutes: number): string {
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  return remainder === 0 ? `${hours} h` : `${hours} h ${remainder} min`;
+}
+
+function effortProgress(minutes: number): number {
+  return (
+    ((Math.log(minutes) - Math.log(MIN_EFFORT_MINUTES)) /
+      (Math.log(MAX_EFFORT_MINUTES) - Math.log(MIN_EFFORT_MINUTES))) *
+    100
+  );
+}
+
+function effortFromProgress(progress: number): number {
+  const minutes =
+    MIN_EFFORT_MINUTES *
+    Math.exp((progress / 100) * (Math.log(MAX_EFFORT_MINUTES) - Math.log(MIN_EFFORT_MINUTES)));
+  return Math.min(MAX_EFFORT_MINUTES, Math.max(MIN_EFFORT_MINUTES, Math.round(minutes / 5) * 5));
+}
 
 /**
  * Create a task, opened by tapping the spot on the grid where it belongs.
@@ -23,70 +73,109 @@ export function TaskForm({
   areas,
   importance: initialImportance,
   effortMinutes: initialEffort,
+  task,
   onDone,
 }: {
   areas: Area[];
   importance: number;
   effortMinutes: number;
+  task?: Task;
   onDone: () => void;
 }) {
-  const [title, setTitle] = useState('');
-  const [areaId, setAreaId] = useState<string | null>(areas[0]?.id ?? null);
-  const [importance, setImportance] = useState(initialImportance);
-  const [effort, setEffort] = useState(initialEffort);
+  const [title, setTitle] = useState(task?.title ?? '');
+  const [areaId, setAreaId] = useState<string | null>(task?.areaId ?? areas[0]?.id ?? null);
+  const [importance, setImportance] = useState(task?.importance ?? initialImportance);
+  const [effort, setEffort] = useState(task?.effortMinutes ?? initialEffort);
 
-  const [kind, setKind] = useState<string>('none');
-  const [byPeriod, setByPeriod] = useState(true);
-  const [date, setDate] = useState('');
-  const [period, setPeriod] = useState<{ amount: number; unit: string } | null>(null);
+  const [deadlineOptions, setDeadlineOptions] = useState<DeadlineOption[]>([...DEADLINE_KINDS]);
+  const [kind, setKind] = useState<DeadlineKind>(
+    task && DEADLINE_KINDS.some((option) => option.value === task.deadlineKind)
+      ? (task.deadlineKind as DeadlineKind)
+      : 'none',
+  );
+  const [dueMode, setDueMode] = useState<DueMode>(task?.dueAmount ? 'relative' : 'date');
+  const [date, setDate] = useState(task?.dueAt ? task.dueAt.toISOString().slice(0, 10) : '');
+  const [relativeAmount, setRelativeAmount] = useState(task?.dueAmount ?? 1);
+  const [relativeUnit, setRelativeUnit] = useState(task?.dueUnit ?? 'week');
 
-  const [place, setPlace] = useState<{ label: string; lat: number; lng: number } | null>(null);
-  const [radius, setRadius] = useState(250);
-  const [locating, setLocating] = useState(false);
+  const [place, setPlace] = useState<PickedPlace | null>(
+    task?.lat != null && task.lng != null
+      ? { label: task.placeLabel ?? 'Pinned location', lat: task.lat, lng: task.lng }
+      : null,
+  );
+  const [radius, setRadius] = useState(task?.radiusM ?? 250);
+  const [choosingPlace, setChoosingPlace] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
+  const hold = useRef<{
+    timer: ReturnType<typeof setTimeout>;
+    x: number;
+    y: number;
+  } | null>(null);
+
+  useEffect(() => {
+    const options = loadDeadlineOrder();
+    setDeadlineOptions(options);
+    if (!task) setKind(options[0]?.value ?? 'none');
+  }, []);
 
   /** The instant the deadline lands on, whichever way it was entered. */
   function resolveDue(): Date | null {
     if (kind === 'none') return null;
-    if (byPeriod) {
-      if (!period) return null;
-      return addPeriodTo(new Date(), period.amount, period.unit);
-    }
+    if (dueMode === 'tomorrow') return addPeriodTo(new Date(), 1, 'day');
+    if (dueMode === 'relative') return addPeriodTo(new Date(), relativeAmount, relativeUnit);
     if (!date) return null;
     // End of the chosen day, not midnight at its start: "due Friday" means
     // Friday is still fine, and midnight would make it already late.
-    const d = new Date(date);
-    d.setHours(23, 59, 59, 999);
-    return d;
+    return new Date(`${date}T23:59:59.999`);
   }
 
-  function useMyLocation() {
-    setError(null);
-    if (!('geolocation' in navigator)) {
-      setError('This browser cannot read a location.');
-      return;
+  function makeDeadlineDefault(value: DeadlineKind) {
+    const reordered = [
+      ...deadlineOptions.filter((option) => option.value === value),
+      ...deadlineOptions.filter((option) => option.value !== value),
+    ];
+    setDeadlineOptions(reordered);
+    setKind(value);
+    try {
+      window.localStorage.setItem(
+        DEADLINE_ORDER_KEY,
+        JSON.stringify(reordered.map((option) => option.value)),
+      );
+    } catch {}
+    navigator.vibrate?.(30);
+  }
+
+  function startDeadlineHold(event: React.PointerEvent, value: DeadlineKind) {
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    stopDeadlineHold();
+    hold.current = {
+      x: event.clientX,
+      y: event.clientY,
+      timer: setTimeout(() => makeDeadlineDefault(value), 550),
+    };
+  }
+
+  function moveDeadlineHold(event: React.PointerEvent) {
+    if (!hold.current) return;
+    if (Math.hypot(event.clientX - hold.current.x, event.clientY - hold.current.y) > 8) {
+      stopDeadlineHold();
     }
-    setLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setPlace({
-          label: 'Here',
-          lat: Number(pos.coords.latitude.toFixed(6)),
-          lng: Number(pos.coords.longitude.toFixed(6)),
-        });
-        setLocating(false);
-      },
-      () => {
-        setError('Could not get a location. Allow location access and try again.');
-        setLocating(false);
-      },
-      { enableHighAccuracy: true, timeout: 10_000 },
-    );
+  }
+
+  function stopDeadlineHold() {
+    if (!hold.current) return;
+    clearTimeout(hold.current.timer);
+    hold.current = null;
   }
 
   const due = resolveDue();
+  const relative = dueMode === 'relative';
+  const dueAmount =
+    kind === 'none' || dueMode === 'date' ? null : dueMode === 'tomorrow' ? 1 : relativeAmount;
+  const dueUnit =
+    kind === 'none' || dueMode === 'date' ? null : dueMode === 'tomorrow' ? 'day' : relativeUnit;
 
   return (
     <div className="areaform">
@@ -111,6 +200,7 @@ export function TaskForm({
           <div className="chips">
             {areas.map((a) => (
               <button
+                type="button"
                 key={a.id}
                 className={`chip${a.id === areaId ? ' chip--on' : ''}`}
                 onClick={() => setAreaId(a.id)}
@@ -119,6 +209,7 @@ export function TaskForm({
               </button>
             ))}
             <button
+              type="button"
               className={`chip${areaId === null ? ' chip--on' : ''}`}
               onClick={() => setAreaId(null)}
             >
@@ -128,163 +219,223 @@ export function TaskForm({
         </>
       ) : null}
 
-      <span className="field__label">How important</span>
-      <div className="chips">
-        {IMPORTANCE.map((i) => (
-          <button
-            key={i.value}
-            className={`chip${i.value === importance ? ' chip--on' : ''}`}
-            onClick={() => setImportance(i.value)}
-          >
-            {i.label}
-          </button>
-        ))}
+      <div className="task-scale">
+        <div className="task-scale__head">
+          <span className="field__label">Y · Importance</span>
+          <strong>{IMPORTANCE.find((option) => option.value === importance)?.label}</strong>
+        </div>
+        <input
+          className="task-scale__range"
+          type="range"
+          min={1}
+          max={4}
+          step={1}
+          value={importance}
+          onChange={(event) => setImportance(Number(event.target.value))}
+          aria-label="Y importance"
+        />
+        <div className="task-scale__ends">
+          <span>Low</span>
+          <span>Critical</span>
+        </div>
       </div>
 
-      <span className="field__label">How long</span>
-      <div className="chips">
-        {EFFORTS.map((e) => (
-          <button
-            key={e.value}
-            className={`chip${e.value === effort ? ' chip--on' : ''}`}
-            onClick={() => setEffort(e.value)}
-          >
-            {e.label}
-          </button>
-        ))}
+      <div className="task-scale">
+        <div className="task-scale__head">
+          <span className="field__label">X · Time to finish</span>
+          <strong>{formatEffort(effort)}</strong>
+        </div>
+        <input
+          className="task-scale__range"
+          type="range"
+          min={0}
+          max={100}
+          step={1}
+          value={effortProgress(effort)}
+          onChange={(event) => setEffort(effortFromProgress(Number(event.target.value)))}
+          aria-label="X time to finish"
+        />
+        <div className="task-scale__ends">
+          <span>5 min</span>
+          <span>24 h</span>
+        </div>
       </div>
 
       <span className="field__label">Deadline</span>
       <div className="chips">
-        {DEADLINE_KINDS.map((k) => (
+        {deadlineOptions.map((option, index) => (
           <button
-            key={k.value}
-            className={`chip${k.value === kind ? ' chip--on' : ''}`}
-            onClick={() => setKind(k.value)}
+            type="button"
+            key={option.value}
+            className={`chip${option.value === kind ? ' chip--on' : ''}`}
+            onClick={() => setKind(option.value)}
+            onPointerDown={(event) => startDeadlineHold(event, option.value)}
+            onPointerMove={moveDeadlineHold}
+            onPointerUp={stopDeadlineHold}
+            onPointerCancel={stopDeadlineHold}
+            onContextMenu={(event) => event.preventDefault()}
           >
-            {k.label}
+            {option.label}
+            {index === 0 ? ' · default' : ''}
           </button>
         ))}
       </div>
       <p className="formhint">{DEADLINE_KINDS.find((k) => k.value === kind)?.hint}</p>
+      <p className="formhint">
+        Press and hold a deadline type to move it first and make it default.
+      </p>
 
       {kind !== 'none' ? (
         <>
           <div className="chips">
             <button
-              className={`chip${byPeriod ? ' chip--on' : ''}`}
-              onClick={() => setByPeriod(true)}
+              type="button"
+              className={`chip${dueMode === 'tomorrow' ? ' chip--on' : ''}`}
+              onClick={() => setDueMode('tomorrow')}
             >
-              In a while
+              Tomorrow
             </button>
             <button
-              className={`chip${!byPeriod ? ' chip--on' : ''}`}
-              onClick={() => setByPeriod(false)}
+              type="button"
+              className={`chip${dueMode === 'date' ? ' chip--on' : ''}`}
+              onClick={() => setDueMode('date')}
             >
               On a date
             </button>
+            <button
+              type="button"
+              className={`chip${relative ? ' chip--on' : ''}`}
+              onClick={() => setDueMode('relative')}
+            >
+              In…
+            </button>
           </div>
 
-          {byPeriod ? (
-            <div className="chips">
-              {DUE_PERIODS.map((p) => (
-                <button
-                  key={p.label}
-                  className={`chip${
-                    period?.amount === p.amount && period?.unit === p.unit ? ' chip--on' : ''
-                  }`}
-                  onClick={() => setPeriod({ amount: p.amount, unit: p.unit })}
-                >
-                  {p.label}
-                </button>
-              ))}
+          {relative ? (
+            <div className="relative-due">
+              <input
+                className="field__input relative-due__amount"
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={365}
+                value={relativeAmount}
+                onChange={(event) => {
+                  const value = Number(event.target.value);
+                  setRelativeAmount(Number.isFinite(value) ? Math.min(365, Math.max(1, value)) : 1);
+                }}
+                aria-label="Deadline amount"
+              />
+              <div className="chips">
+                {['day', 'week', 'month'].map((unit) => (
+                  <button
+                    type="button"
+                    key={unit}
+                    className={`chip${relativeUnit === unit ? ' chip--on' : ''}`}
+                    onClick={() => setRelativeUnit(unit)}
+                  >
+                    {unit}
+                    {relativeAmount === 1 ? '' : 's'}
+                  </button>
+                ))}
+              </div>
             </div>
-          ) : (
+          ) : dueMode === 'date' ? (
             <input
               type="date"
               className="field__input"
               value={date}
-              onChange={(e) => setDate(e.target.value)}
+              onChange={(event) => setDate(event.target.value)}
             />
-          )}
+          ) : null}
 
           {due ? (
             <p className="formhint">
-              Due {due.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
-              {kind === 'expires' ? '. After that it drops off the board.' : '. After that it falls behind.'}
+              Due{' '}
+              {due.toLocaleDateString('en-GB', {
+                weekday: 'short',
+                day: 'numeric',
+                month: 'short',
+              })}
+              {kind === 'expires'
+                ? '. After that it drops off the board.'
+                : '. After that it falls behind.'}
             </p>
           ) : null}
         </>
       ) : null}
 
       <span className="field__label">Place</span>
+      <div className="chips">
+        <button
+          type="button"
+          className={`chip${place ? ' chip--on' : ''}`}
+          onClick={() => setChoosingPlace(true)}
+        >
+          {place ? 'Change place on map' : 'Use my location'}
+        </button>
+        <button
+          type="button"
+          className={`chip${place === null ? ' chip--on' : ''}`}
+          onClick={() => setPlace(null)}
+        >
+          Anywhere
+        </button>
+      </div>
+
       {place ? (
-        <>
-          <div className="chips">
-            <button className="chip chip--on" onClick={() => setPlace(null)}>
-              {place.label} · {place.lat.toFixed(4)}, {place.lng.toFixed(4)} ✕
-            </button>
-          </div>
-          <span className="field__label">Alert within</span>
-          <div className="chips">
-            {RADII.map((r) => (
-              <button
-                key={r.value}
-                className={`chip${r.value === radius ? ' chip--on' : ''}`}
-                onClick={() => setRadius(r.value)}
-              >
-                {r.label}
-              </button>
-            ))}
-          </div>
-          <p className="formhint">
-            Saved with the task. The alert itself needs the Android app, which is the only part
-            that can watch for you arriving while the phone is in your pocket.
-          </p>
-        </>
-      ) : (
-        <div className="chips">
-          <button className="chip" disabled={locating} onClick={useMyLocation}>
-            {locating ? 'Finding you…' : 'Use my location'}
-          </button>
-          <button className="chip chip--on" onClick={() => setPlace(null)}>
-            Anywhere
-          </button>
-        </div>
-      )}
+        <p className="formhint">
+          {place.label} · {place.lat.toFixed(6)}, {place.lng.toFixed(6)} · radius {radius} m
+        </p>
+      ) : null}
+
+      {choosingPlace ? (
+        <LocationPicker
+          value={place}
+          radius={radius}
+          onClose={() => setChoosingPlace(false)}
+          onChoose={(nextPlace, nextRadius) => {
+            setPlace(nextPlace);
+            setRadius(nextRadius);
+            setChoosingPlace(false);
+          }}
+        />
+      ) : null}
 
       {error ? <p className="pair__error">{error}</p> : null}
 
       <div className="areaform__actions">
+        <button type="button" className="btn btn--quiet" disabled={pending} onClick={onDone}>
+          Cancel
+        </button>
         <button
+          type="button"
           className="btn btn--primary"
-          disabled={pending || !title.trim()}
+          disabled={pending || !title.trim() || (kind !== 'none' && !due)}
           onClick={() => {
             setError(null);
             start(async () => {
-              const result = await addTask({
+              const input = {
                 title,
                 areaId,
                 importance,
                 effortMinutes: effort,
                 deadlineKind: kind,
                 dueAt: due ? due.toISOString() : null,
-                dueAmount: byPeriod ? (period?.amount ?? null) : null,
-                dueUnit: byPeriod ? (period?.unit ?? null) : null,
+                dueAmount,
+                dueUnit,
                 placeLabel: place?.label ?? null,
                 lat: place?.lat ?? null,
                 lng: place?.lng ?? null,
                 radiusM: place ? radius : null,
-              });
+              };
+              const result = task ? await editTask(task.id, input) : await addTask(input);
               if (!result.ok) return setError(result.error);
               onDone();
             });
           }}
         >
-          {pending ? 'Adding…' : 'Add task'}
-        </button>
-        <button className="btn btn--quiet" disabled={pending} onClick={onDone}>
-          Cancel
+          {pending ? 'Saving…' : task ? 'Save task' : 'Add task'}
         </button>
       </div>
     </div>

@@ -12,13 +12,19 @@ export const IMPORTANCE = [
   { value: 4, label: 'Critical' },
 ] as const;
 
+export const MIN_EFFORT_MINUTES = 5;
+export const MAX_EFFORT_MINUTES = 24 * 60;
+
 export const EFFORTS = [
-  { value: 5, label: '5 min' },
+  { value: MIN_EFFORT_MINUTES, label: '5 min' },
   { value: 15, label: '15 min' },
   { value: 30, label: '30 min' },
   { value: 60, label: '1 hour' },
   { value: 120, label: '2 hours' },
-  { value: 240, label: '4 hours +' },
+  { value: 240, label: '4 hours' },
+  { value: 480, label: '8 hours' },
+  { value: 720, label: '12 hours' },
+  { value: MAX_EFFORT_MINUTES, label: '24 hours' },
 ] as const;
 
 /**
@@ -42,16 +48,6 @@ export const DEADLINE_KINDS = [
 ] as const;
 
 export type DeadlineKind = (typeof DEADLINE_KINDS)[number]['value'];
-
-/** Common "in N" windows, so a rough deadline is one tap rather than a date picker. */
-export const DUE_PERIODS = [
-  { amount: 1, unit: 'day', label: 'Tomorrow' },
-  { amount: 3, unit: 'day', label: 'In 3 days' },
-  { amount: 1, unit: 'week', label: 'In a week' },
-  { amount: 2, unit: 'week', label: 'In 2 weeks' },
-  { amount: 1, unit: 'month', label: 'In a month' },
-  { amount: 3, unit: 'month', label: 'In 3 months' },
-] as const;
 
 /** How close counts as "here", for a task pinned to a place. */
 export const RADII = [
@@ -81,7 +77,9 @@ export function addPeriodTo(base: Date, amount: number, unit: string): Date {
  */
 export function unplace(xPercent: number, yPercent: number) {
   const xRaw = Math.min(Math.max((xPercent - 6) / 0.88, 0), 100);
-  const minutes = 5 * Math.exp((xRaw / 100) * (Math.log(240) - Math.log(5)));
+  const minutes =
+    MIN_EFFORT_MINUTES *
+    Math.exp((xRaw / 100) * (Math.log(MAX_EFFORT_MINUTES) - Math.log(MIN_EFFORT_MINUTES)));
   const effortMinutes = EFFORTS.reduce((best, e) =>
     Math.abs(e.value - minutes) < Math.abs(best.value - minutes) ? e : best,
   ).value;

@@ -4,7 +4,7 @@ import { sourceById } from '@vivy/core';
 import { Dock } from '@/components/shell';
 import { loadSteps } from '@/lib/onboarding';
 import { listDevices } from '@/lib/devices';
-import { requireUserId } from '@/lib/session';
+import { requirePageUserId } from '@/lib/page-session';
 import { SourceControls } from './controls';
 import { Pairing } from './pairing';
 
@@ -23,7 +23,7 @@ export default async function SourcePage({ params }: { params: Promise<{ id: str
   const source = sourceById(id);
   if (!source) notFound();
 
-  const userId = await requireUserId();
+  const userId = await requirePageUserId();
   const steps = await loadSteps(userId);
   const state = steps.find((s) => s.source.id === id);
   const planned = source.availability === 'planned';

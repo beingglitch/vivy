@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { createTask, deleteTask, setTaskStatus } from '@/lib/tasks';
+import { createTask, deleteTask, setTaskStatus, updateTask } from '@/lib/tasks';
 import { requireUserId } from '@/lib/session';
 
 export type Result = { ok: true } | { ok: false; error: string };
@@ -63,6 +63,28 @@ export async function completeTask(taskId: string): Promise<Result> {
     return { ok: true };
   } catch {
     return { ok: false, error: 'Could not update that task.' };
+  }
+}
+
+export async function archiveTask(taskId: string): Promise<Result> {
+  try {
+    await setTaskStatus(await requireUserId(), taskId, 'dropped');
+    refresh();
+    return { ok: true };
+  } catch {
+    return { ok: false, error: 'Could not archive that task.' };
+  }
+}
+
+export async function editTask(taskId: string, input: TaskInput): Promise<Result> {
+  try {
+    const due = input.dueAt ? new Date(input.dueAt) : null;
+    const dueAt = due && !Number.isNaN(due.getTime()) ? due : null;
+    await updateTask(await requireUserId(), taskId, { ...input, dueAt });
+    refresh();
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : 'Could not save.' };
   }
 }
 

@@ -3,7 +3,7 @@ import { ChevronIcon } from '@/components/icons';
 import { Dock } from '@/components/shell';
 import { PushToggle } from '@/components/push-toggle';
 import { loadSteps, type StepState } from '@/lib/onboarding';
-import { requireUserId } from '@/lib/session';
+import { requirePageUserId } from '@/lib/page-session';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,7 +18,7 @@ export const dynamic = 'force-dynamic';
  * not "incomplete".
  */
 export default async function SourcesPage() {
-  const steps = await loadSteps(await requireUserId());
+  const steps = await loadSteps(await requirePageUserId());
   const connected = steps.filter((s) => s.status === 'done').length;
 
   return (

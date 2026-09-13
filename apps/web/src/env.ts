@@ -20,6 +20,7 @@ const Env = z.object({
   VAPID_PUBLIC_KEY: z.string().optional(),
   VAPID_PRIVATE_KEY: z.string().optional(),
   VAPID_SUBJECT: z.string().optional(),
+  NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: z.string().optional(),
   CRON_SECRET: z.string().optional(),
 
   /**

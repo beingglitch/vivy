@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { archiveArea, createArea, updateArea } from '@/lib/areas';
+import { archiveArea, createArea, deleteAreaPermanently, updateArea } from '@/lib/areas';
 import { requireUserId } from '@/lib/session';
 
 /**
@@ -18,13 +18,9 @@ function refresh() {
   revalidatePath('/today');
 }
 
-export async function addArea(
-  name: string,
-  colour: string,
-  cadenceDays: number | null,
-): Promise<Result> {
+export async function addArea(name: string, colour: string): Promise<Result> {
   try {
-    await createArea(await requireUserId(), name, colour, cadenceDays);
+    await createArea(await requireUserId(), name, colour);
     refresh();
     return { ok: true };
   } catch (error) {
@@ -34,7 +30,7 @@ export async function addArea(
 
 export async function editArea(
   areaId: string,
-  patch: { name?: string; colour?: string; cadenceDays?: number | null },
+  patch: { name?: string; colour?: string },
 ): Promise<Result> {
   try {
     await updateArea(await requireUserId(), areaId, patch);
@@ -52,5 +48,15 @@ export async function removeArea(areaId: string): Promise<Result> {
     return { ok: true };
   } catch {
     return { ok: false, error: 'Could not archive that area.' };
+  }
+}
+
+export async function deleteArea(areaId: string): Promise<Result> {
+  try {
+    await deleteAreaPermanently(await requireUserId(), areaId);
+    refresh();
+    return { ok: true };
+  } catch {
+    return { ok: false, error: 'Could not delete that area.' };
   }
 }

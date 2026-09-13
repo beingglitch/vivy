@@ -2,7 +2,7 @@ import 'server-only';
 import { randomUUID } from 'node:crypto';
 import { and, asc, eq, lt, ne } from 'drizzle-orm';
 import { areas, db, tasks } from '@vivy/db';
-import { EFFORTS, IMPORTANCE } from './task-scales';
+import { EFFORTS, IMPORTANCE, MAX_EFFORT_MINUTES, MIN_EFFORT_MINUTES } from './task-scales';
 
 export { EFFORTS, IMPORTANCE };
 
@@ -54,8 +54,11 @@ export interface Task {
  * would actually do them in.
  */
 export function place(importance: number, effortMinutes: number, dueAt: Date | null) {
-  const minutes = Math.min(Math.max(effortMinutes, 5), 240);
-  const x = ((Math.log(minutes) - Math.log(5)) / (Math.log(240) - Math.log(5))) * 100;
+  const minutes = Math.min(Math.max(effortMinutes, MIN_EFFORT_MINUTES), MAX_EFFORT_MINUTES);
+  const x =
+    ((Math.log(minutes) - Math.log(MIN_EFFORT_MINUTES)) /
+      (Math.log(MAX_EFFORT_MINUTES) - Math.log(MIN_EFFORT_MINUTES))) *
+    100;
 
   let weight = (importance - 1) / 3; // 0 to 1
   if (dueAt) {
@@ -76,7 +79,7 @@ export function place(importance: number, effortMinutes: number, dueAt: Date | n
     // Inset so a dot at either extreme is not clipped by the grid border.
     x: 6 + x * 0.88,
     y: 6 + (1 - weight) * 88,
-    size: 8 + (minutes / 240) * 16,
+    size: 8 + (minutes / MAX_EFFORT_MINUTES) * 16,
   };
 }
 
@@ -187,7 +190,7 @@ export async function createTask(userId: string, input: NewTask): Promise<void> 
       title,
       areaId: input.areaId ?? null,
       importance: clamp(input.importance ?? 2, 1, 4),
-      effortMinutes: clamp(input.effortMinutes ?? 30, 5, 240),
+      effortMinutes: clamp(input.effortMinutes ?? 30, MIN_EFFORT_MINUTES, MAX_EFFORT_MINUTES),
       dueAt: kind === 'none' ? null : (input.dueAt ?? null),
       deadlineKind: kind,
       dueAmount: input.dueAmount ?? null,
@@ -197,6 +200,39 @@ export async function createTask(userId: string, input: NewTask): Promise<void> 
       lng: hasPlace ? input.lng : null,
       radiusM: hasPlace ? input.radiusM : null,
     });
+}
+
+export async function updateTask(userId: string, taskId: string, input: NewTask): Promise<void> {
+  const title = input.title.trim();
+  if (!title) throw new Error('Give the task a title.');
+  if (title.length > 200) throw new Error('That title is too long.');
+
+  const kind = input.deadlineKind ?? 'none';
+  if (!['none', 'expires', 'persists'].includes(kind)) throw new Error('Unknown deadline type.');
+  if (kind !== 'none' && !input.dueAt) throw new Error('Pick a date for the deadline.');
+
+  const hasPlace = input.lat != null && input.lng != null;
+  if (hasPlace && !input.radiusM) throw new Error('Choose how close counts as here.');
+  if (input.placeLabel && !hasPlace) throw new Error('That place has no coordinates.');
+
+  await db()
+    .update(tasks)
+    .set({
+      title,
+      areaId: input.areaId ?? null,
+      importance: clamp(input.importance ?? 2, 1, 4),
+      effortMinutes: clamp(input.effortMinutes ?? 30, MIN_EFFORT_MINUTES, MAX_EFFORT_MINUTES),
+      dueAt: kind === 'none' ? null : (input.dueAt ?? null),
+      deadlineKind: kind,
+      dueAmount: input.dueAmount ?? null,
+      dueUnit: input.dueUnit ?? null,
+      placeLabel: hasPlace ? (input.placeLabel ?? null) : null,
+      lat: hasPlace ? input.lat : null,
+      lng: hasPlace ? input.lng : null,
+      radiusM: hasPlace ? input.radiusM : null,
+      updatedAt: new Date(),
+    })
+    .where(and(eq(tasks.id, taskId), eq(tasks.userId, userId)));
 }
 
 export async function setTaskStatus(
@@ -217,7 +253,9 @@ export async function setTaskStatus(
 }
 
 export async function deleteTask(userId: string, taskId: string): Promise<void> {
-  await db().delete(tasks).where(and(eq(tasks.id, taskId), eq(tasks.userId, userId)));
+  await db()
+    .delete(tasks)
+    .where(and(eq(tasks.id, taskId), eq(tasks.userId, userId)));
 }
 
 /**
