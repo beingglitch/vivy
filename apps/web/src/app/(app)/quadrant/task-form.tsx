@@ -72,6 +72,9 @@ function effortFromProgress(progress: number): number {
  */
 export function TaskForm({
   areas,
+  googleMapsApiKey,
+  initialTitle,
+  initialAreaId,
   importance: initialImportance,
   effortMinutes: initialEffort,
   task,
@@ -79,14 +82,21 @@ export function TaskForm({
   onDone,
 }: {
   areas: Area[];
+  googleMapsApiKey: string;
+  initialTitle?: string;
+  initialAreaId?: string | null;
   importance: number;
   effortMinutes: number;
   task?: Task;
   onQuadrantChange?: (values: { importance: number; effortMinutes: number }) => void;
   onDone: () => void;
 }) {
-  const [title, setTitle] = useState(task?.title ?? '');
-  const [areaId, setAreaId] = useState<string | null>(task?.areaId ?? areas[0]?.id ?? null);
+  const [title, setTitle] = useState(task?.title ?? initialTitle ?? '');
+  const [areaId, setAreaId] = useState<string | null>(() => {
+    if (task) return task.areaId;
+    if (initialAreaId !== undefined) return initialAreaId;
+    return areas[0]?.id ?? null;
+  });
   const [importance, setImportance] = useState(task?.importance ?? initialImportance);
   const [effort, setEffort] = useState(task?.effortMinutes ?? initialEffort);
 
@@ -185,6 +195,9 @@ export function TaskForm({
     kind === 'none' || dueMode === 'date' ? null : dueMode === 'tomorrow' ? 1 : relativeAmount;
   const dueUnit =
     kind === 'none' || dueMode === 'date' ? null : dueMode === 'tomorrow' ? 'day' : relativeUnit;
+  const selectedArea = areas.find((area) => area.id === areaId);
+  const point = scalePoint(importance, effort);
+  const destination = quadrantLabel(quadrantFor(importance, effort));
 
   return (
     <div className="sheet-backdrop" role="presentation">
@@ -193,22 +206,32 @@ export function TaskForm({
         <div className="sheet-heading">
           <span>{task ? 'Edit task' : 'Place this task'}</span>
         </div>
-        <div className="field">
-          <label className="field__label" htmlFor="t-title">
-            Task
-          </label>
-          <input
-            id="t-title"
-            className="field__input"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="What needs doing?"
-            autoComplete="off"
-            autoFocus
-          />
-        </div>
+        {!task && initialTitle ? (
+          <div className="task-sheet__identity">
+            <strong>{title}</strong>
+            <span>
+              <i style={{ background: selectedArea?.colour ?? '#8a8a90' }} />
+              {selectedArea?.name ?? 'Unfiled'}
+            </span>
+          </div>
+        ) : (
+          <div className="field">
+            <label className="field__label" htmlFor="t-title">
+              Task
+            </label>
+            <input
+              id="t-title"
+              className="field__input"
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+              placeholder="What needs doing?"
+              autoComplete="off"
+              autoFocus
+            />
+          </div>
+        )}
 
-        {areas.length > 0 ? (
+        {(task || !initialTitle) && areas.length > 0 ? (
           <>
             <span className="field__label">Area</span>
             <div className="chips">
@@ -233,39 +256,9 @@ export function TaskForm({
           </>
         ) : null}
 
-        <div className="task-quadrants">
-          <span className="field__label">Quadrant</span>
-          <div className="task-quadrants__grid">
-            {[
-              { value: 'top-left', label: 'Important · quick', importance: 4, effort: 30 },
-              { value: 'top-right', label: 'Important · longer', importance: 4, effort: 240 },
-              { value: 'bottom-left', label: 'Less important · quick', importance: 1, effort: 30 },
-              {
-                value: 'bottom-right',
-                label: 'Less important · longer',
-                importance: 1,
-                effort: 240,
-              },
-            ].map((option) => (
-              <button
-                type="button"
-                key={option.value}
-                className={`task-quadrants__option${
-                  quadrantFor(importance, effort) === option.value
-                    ? ' task-quadrants__option--on'
-                    : ''
-                }`}
-                onClick={() => updateScales(option.importance, option.effort)}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
         <div className="task-scale">
           <div className="task-scale__head">
-            <span className="field__label">Y · Importance</span>
+            <span className="field__label">How important</span>
             <strong>{IMPORTANCE.find((option) => option.value === importance)?.label}</strong>
           </div>
           <input
@@ -275,6 +268,9 @@ export function TaskForm({
             max={4}
             step={1}
             value={importance}
+            style={
+              { '--range-progress': `${((importance - 1) / 3) * 100}%` } as React.CSSProperties
+            }
             onChange={(event) => updateScales(Number(event.target.value), effort)}
             aria-label="Y importance"
           />
@@ -286,7 +282,7 @@ export function TaskForm({
 
         <div className="task-scale">
           <div className="task-scale__head">
-            <span className="field__label">X · Time to finish</span>
+            <span className="field__label">How long</span>
             <strong>{formatEffort(effort)}</strong>
           </div>
           <input
@@ -296,6 +292,7 @@ export function TaskForm({
             max={100}
             step={1}
             value={effortProgress(effort)}
+            style={{ '--range-progress': `${effortProgress(effort)}%` } as React.CSSProperties}
             onChange={(event) =>
               updateScales(importance, effortFromProgress(Number(event.target.value)))
             }
@@ -308,13 +305,18 @@ export function TaskForm({
         </div>
 
         <span className="field__label">Deadline</span>
-        <div className="chips">
+        <div className="chips task-sheet__options">
           {deadlineOptions.map((option, index) => (
             <button
               type="button"
               key={option.value}
               className={`chip${option.value === kind ? ' chip--on' : ''}`}
-              onClick={() => setKind(option.value)}
+              onClick={() => {
+                setKind(option.value);
+                if (option.value !== 'none' && dueMode === 'date' && !date) {
+                  setDueMode('tomorrow');
+                }
+              }}
               onPointerDown={(event) => startDeadlineHold(event, option.value)}
               onPointerMove={moveDeadlineHold}
               onPointerUp={stopDeadlineHold}
@@ -333,8 +335,9 @@ export function TaskForm({
         ) : null}
 
         {kind !== 'none' ? (
-          <>
-            <div className="chips">
+          <div className="task-deadline-editor">
+            <span className="field__label">When is it due?</span>
+            <div className="chips task-sheet__options">
               <button
                 type="button"
                 className={`chip${dueMode === 'tomorrow' ? ' chip--on' : ''}`}
@@ -375,7 +378,7 @@ export function TaskForm({
                   }}
                   aria-label="Deadline amount"
                 />
-                <div className="chips">
+                <div className="chips task-sheet__options">
                   {['day', 'week', 'month'].map((unit) => (
                     <button
                       type="button"
@@ -397,11 +400,23 @@ export function TaskForm({
                 onChange={(event) => setDate(event.target.value)}
               />
             ) : null}
-          </>
+            {due ? (
+              <p className="task-deadline-editor__date">
+                Deadline ·{' '}
+                {due.toLocaleDateString('en-GB', {
+                  weekday: 'short',
+                  day: 'numeric',
+                  month: 'short',
+                })}
+              </p>
+            ) : (
+              <p className="task-deadline-editor__date">Choose a deadline date.</p>
+            )}
+          </div>
         ) : null}
 
         <span className="field__label">Place</span>
-        <div className="chips">
+        <div className="chips task-sheet__options task-sheet__options--place">
           <button
             type="button"
             className={`chip${place ? ' chip--on' : ''}`}
@@ -424,8 +439,32 @@ export function TaskForm({
           </p>
         ) : null}
 
+        <div className="task-placement-preview">
+          <div className="task-placement-preview__map" aria-hidden>
+            <span className="task-placement-preview__hot" />
+            <span className="task-placement-preview__vline" />
+            <span className="task-placement-preview__hline" />
+            <span
+              className="task-placement-preview__dot"
+              style={{
+                left: `${point.x}%`,
+                top: `${point.y}%`,
+                background: selectedArea?.colour ?? 'var(--accent)',
+              }}
+            />
+          </div>
+          <span>
+            <strong>Lands in {destination}</strong>
+            <small>
+              {IMPORTANCE.find((option) => option.value === importance)?.label} importance ·{' '}
+              {formatEffort(effort)}
+            </small>
+          </span>
+        </div>
+
         {choosingPlace ? (
           <LocationPicker
+            apiKey={googleMapsApiKey}
             value={place}
             radius={radius}
             onClose={() => setChoosingPlace(false)}
@@ -476,4 +515,20 @@ export function TaskForm({
       </div>
     </div>
   );
+}
+
+function scalePoint(importance: number, effortMinutes: number) {
+  const minutes = Math.min(Math.max(effortMinutes, MIN_EFFORT_MINUTES), MAX_EFFORT_MINUTES);
+  const x =
+    ((Math.log(minutes) - Math.log(MIN_EFFORT_MINUTES)) /
+      (Math.log(MAX_EFFORT_MINUTES) - Math.log(MIN_EFFORT_MINUTES))) *
+    100;
+  return { x: 6 + x * 0.88, y: 6 + (1 - (importance - 1) / 3) * 88 };
+}
+
+function quadrantLabel(quadrant: ReturnType<typeof quadrantFor>) {
+  if (quadrant === 'top-left') return 'Do now';
+  if (quadrant === 'top-right') return 'Schedule a block';
+  if (quadrant === 'bottom-left') return 'Batch';
+  return 'Drop';
 }

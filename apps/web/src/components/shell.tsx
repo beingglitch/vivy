@@ -1,9 +1,38 @@
 'use client';
 
 import Link from 'next/link';
+import type { Route } from 'next';
 import { usePathname } from 'next/navigation';
-import { useState } from 'react';
-import { HomeIcon, MicIcon, MoneyIcon, MoreIcon, QuadrantIcon, SendIcon, TodayIcon } from './icons';
+import { useEffect, useRef, useState } from 'react';
+import {
+  AiIcon,
+  FocusAreaIcon,
+  HomeIcon,
+  LearningIcon,
+  MicIcon,
+  MoneyIcon,
+  MoreIcon,
+  QuadrantIcon,
+  SendIcon,
+  TodayIcon,
+} from './icons';
+
+interface VoiceResultEvent {
+  results: ArrayLike<{ 0?: { transcript?: string } }>;
+}
+
+interface VoiceRecognition {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onresult: ((event: VoiceResultEvent) => void) | null;
+  onend: (() => void) | null;
+  onerror: (() => void) | null;
+  start(): void;
+  stop(): void;
+}
+
+type VoiceRecognitionConstructor = new () => VoiceRecognition;
 
 /**
  * The persistent chrome: status bar, capture composer, tab bar.
@@ -23,6 +52,8 @@ const TABS = [
   { href: '/today', label: 'Today', Icon: TodayIcon },
   { href: '/quadrant', label: 'Quadrant', Icon: QuadrantIcon },
   { href: '/money', label: 'Money', Icon: MoneyIcon },
+  { href: '/more/areas', label: 'Focus area', Icon: FocusAreaIcon },
+  { href: '/learning', label: 'Learning', Icon: LearningIcon },
   { href: '/more', label: 'More', Icon: MoreIcon },
 ] as const;
 
@@ -33,9 +64,21 @@ export function TabBar() {
     <nav className="tabbar" aria-label="Sections">
       {TABS.map(({ href, label, Icon }) => {
         // `/` must match exactly, or it would light up on every route.
-        const active = href === '/' ? pathname === '/' : pathname.startsWith(href);
+        const active =
+          href === '/'
+            ? pathname === '/'
+            : href === '/more'
+              ? pathname === '/more' ||
+                pathname.startsWith('/more/sources') ||
+                pathname.startsWith('/more/settings')
+              : pathname.startsWith(href);
         return (
-          <Link key={href} href={href} className="tab" aria-current={active ? 'page' : undefined}>
+          <Link
+            key={href}
+            href={href as Route}
+            className="tab"
+            aria-current={active ? 'page' : undefined}
+          >
             <span className="tab__icon">
               <Icon />
             </span>
@@ -67,11 +110,104 @@ export function Composer({
 }) {
   const [value, setValue] = useState('');
   const [busy, setBusy] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const [listening, setListening] = useState(false);
+  const [activity, setActivity] = useState(0);
+  const composer = useRef<HTMLFormElement>(null);
+  const recognition = useRef<VoiceRecognition | null>(null);
+  const longPressed = useRef(false);
+  const press = useRef<{
+    timer: ReturnType<typeof setTimeout>;
+    x: number;
+    y: number;
+  } | null>(null);
   const hasText = value.trim().length > 0;
+
+  function collapse() {
+    recognition.current?.stop();
+    recognition.current = null;
+    setListening(false);
+    setExpanded(false);
+  }
+
+  function startVoice() {
+    setExpanded(true);
+    setActivity((current) => current + 1);
+    const voiceWindow = window as Window & {
+      SpeechRecognition?: VoiceRecognitionConstructor;
+      webkitSpeechRecognition?: VoiceRecognitionConstructor;
+    };
+    const VoiceInput = voiceWindow.SpeechRecognition ?? voiceWindow.webkitSpeechRecognition;
+    if (!VoiceInput) return;
+
+    recognition.current?.stop();
+    const next = new VoiceInput();
+    next.continuous = false;
+    next.interimResults = false;
+    next.lang = navigator.language || 'en-IN';
+    next.onresult = (event) => {
+      const transcript = Array.from(event.results)
+        .map((result) => result[0]?.transcript ?? '')
+        .join(' ')
+        .trim();
+      if (transcript) {
+        setValue((current) => `${current}${current ? ' ' : ''}${transcript}`);
+        setActivity((current) => current + 1);
+      }
+    };
+    next.onend = () => {
+      recognition.current = null;
+      setListening(false);
+    };
+    next.onerror = () => {
+      recognition.current = null;
+      setListening(false);
+    };
+    recognition.current = next;
+    setListening(true);
+    try {
+      next.start();
+    } catch {
+      recognition.current = null;
+      setListening(false);
+    }
+  }
+
+  function stopPress() {
+    if (!press.current) return;
+    clearTimeout(press.current.timer);
+    press.current = null;
+  }
+
+  useEffect(() => {
+    if (!expanded) return;
+    const dismiss = (event: PointerEvent) => {
+      if (!composer.current?.contains(event.target as Node)) collapse();
+    };
+    document.addEventListener('pointerdown', dismiss);
+    return () => document.removeEventListener('pointerdown', dismiss);
+  }, [expanded]);
+
+  useEffect(() => {
+    if (!expanded || listening) return;
+    const timer = window.setTimeout(collapse, 8_000);
+    return () => window.clearTimeout(timer);
+  }, [activity, expanded, listening]);
+
+  useEffect(
+    () => () => {
+      recognition.current?.stop();
+      stopPress();
+    },
+    [],
+  );
 
   return (
     <form
-      className={`composer${hasText ? ' composer--active' : ''}`}
+      ref={composer}
+      className={`composer${expanded ? ' composer--expanded' : ' composer--collapsed'}${
+        hasText ? ' composer--active' : ''
+      }`}
       onSubmit={(e) => {
         e.preventDefault();
         const text = value.trim();
@@ -79,27 +215,89 @@ export function Composer({
         // Cleared first so the field is ready for the next thought rather than
         // blocked on a round trip.
         setValue('');
+        collapse();
         if (!onSubmit) return;
         setBusy(true);
         void Promise.resolve(onSubmit(text)).finally(() => setBusy(false));
       }}
     >
-      <input
-        className="composer__input"
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        placeholder={placeholder}
-        aria-label={placeholder}
-      />
-      {hasText ? (
+      {!expanded ? (
+        <button
+          type="button"
+          className="composer__btn composer__btn--ai"
+          aria-label="Open Vivy. Press and hold for voice input."
+          onPointerDown={(event) => {
+            if (event.pointerType === 'mouse' && event.button !== 0) return;
+            longPressed.current = false;
+            press.current = {
+              x: event.clientX,
+              y: event.clientY,
+              timer: setTimeout(() => {
+                press.current = null;
+                longPressed.current = true;
+                navigator.vibrate?.(30);
+                startVoice();
+                window.setTimeout(() => {
+                  longPressed.current = false;
+                }, 700);
+              }, 550),
+            };
+          }}
+          onPointerMove={(event) => {
+            if (!press.current) return;
+            if (Math.hypot(event.clientX - press.current.x, event.clientY - press.current.y) > 8) {
+              stopPress();
+            }
+          }}
+          onPointerUp={stopPress}
+          onPointerCancel={stopPress}
+          onContextMenu={(event) => event.preventDefault()}
+          onClick={() => {
+            if (longPressed.current) {
+              longPressed.current = false;
+              return;
+            }
+            setExpanded(true);
+            setActivity((current) => current + 1);
+          }}
+        >
+          <AiIcon />
+        </button>
+      ) : (
+        <input
+          className="composer__input"
+          value={value}
+          onChange={(event) => {
+            setValue(event.target.value);
+            setActivity((current) => current + 1);
+          }}
+          placeholder={listening ? 'Listening…' : placeholder}
+          aria-label={placeholder}
+          autoFocus
+        />
+      )}
+      {expanded && hasText ? (
         <button type="submit" className="composer__btn composer__btn--solid" aria-label="Send">
           <SendIcon />
         </button>
-      ) : (
-        <button type="button" className="composer__btn composer__btn--solid" aria-label="Speak">
+      ) : expanded ? (
+        <button
+          type="button"
+          className={`composer__btn composer__btn--solid${
+            listening ? ' composer__btn--listening' : ''
+          }`}
+          aria-label={listening ? 'Stop voice input' : 'Start voice input'}
+          onClick={() => {
+            if (listening) {
+              recognition.current?.stop();
+              return;
+            }
+            startVoice();
+          }}
+        >
           <MicIcon />
         </button>
-      )}
+      ) : null}
     </form>
   );
 }

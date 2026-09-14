@@ -14,6 +14,8 @@ export const dynamic = 'force-dynamic';
  */
 export default async function QuadrantPage() {
   const userId = await requirePageUserId();
+  const googleMapsApiKey =
+    process.env.GOOGLE_MAPS_API_KEY ?? process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? '';
 
   // Before reading, not after: a task whose deadline was the whole point should
   // never appear on the board one render longer than it deserves.
@@ -23,7 +25,7 @@ export default async function QuadrantPage() {
 
   return (
     <>
-      <QuadrantScreen tasks={tasks} areas={areas} />
+      <QuadrantScreen tasks={tasks} areas={areas} googleMapsApiKey={googleMapsApiKey} />
       <Dock />
     </>
   );

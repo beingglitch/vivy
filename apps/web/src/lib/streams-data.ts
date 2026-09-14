@@ -59,7 +59,7 @@ export async function loadStreams(userId: string): Promise<StreamRow[]> {
       db()
         .select({ id: areas.id, name: areas.name, colour: areas.colour })
         .from(areas)
-        .where(and(eq(areas.userId, userId), isNull(areas.archivedAt))),
+        .where(and(eq(areas.userId, userId), isNull(areas.archivedAt), eq(areas.showOnHome, true))),
       db()
         .select({ areaId: tasks.areaId, completedAt: tasks.completedAt })
         .from(tasks)

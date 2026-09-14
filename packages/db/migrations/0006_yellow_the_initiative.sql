@@ -1,0 +1,1 @@
+ALTER TABLE "areas" ADD COLUMN "show_on_home" boolean DEFAULT true NOT NULL;

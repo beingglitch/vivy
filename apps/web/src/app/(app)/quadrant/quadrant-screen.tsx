@@ -3,7 +3,14 @@
 import { useRef, useState, useTransition } from 'react';
 import type { Area } from '@/lib/areas';
 import type { Task } from '@/lib/tasks';
-import { EFFORTS, IMPORTANCE, quadrantFor, unplace } from '@/lib/task-scales';
+import {
+  EFFORTS,
+  IMPORTANCE,
+  MAX_EFFORT_MINUTES,
+  MIN_EFFORT_MINUTES,
+  quadrantFor,
+  unplace,
+} from '@/lib/task-scales';
 import { archiveTask, completeTask, removeTask } from './actions';
 import { TaskForm } from './task-form';
 
@@ -14,16 +21,36 @@ import { TaskForm } from './task-form';
  * labelled axes and the tinted corner are what explain the idea, so an empty
  * grid teaches where work will land.
  */
-export function QuadrantScreen({ tasks, areas }: { tasks: Task[]; areas: Area[] }) {
+export function QuadrantScreen({
+  tasks,
+  areas,
+  googleMapsApiKey,
+}: {
+  tasks: Task[];
+  areas: Area[];
+  googleMapsApiKey: string;
+}) {
   // Where the new task will land, taken from the tap. Null means the form is
   // closed; the centre is used when it is opened from the header button
   // instead, because that gesture says nothing about placement.
   const [draft, setDraft] = useState<{ importance: number; effortMinutes: number } | null>(null);
+  const [draftTitle, setDraftTitle] = useState('');
+  const [draftAreaId, setDraftAreaId] = useState<string | null>(null);
+  const [placingDetails, setPlacingDetails] = useState(false);
+  const [hoverPoint, setHoverPoint] = useState<{ x: number; y: number } | null>(null);
   const [editing, setEditing] = useState<Task | null>(null);
   const [filtering, setFiltering] = useState(false);
   const [areaFilter, setAreaFilter] = useState<string | null>(null);
   const visibleTasks = areaFilter ? tasks.filter((task) => task.areaId === areaFilter) : tasks;
   const selectedArea = areas.find((area) => area.id === areaFilter);
+  const draftArea = areas.find((area) => area.id === draftAreaId);
+  const draftPoint = draft ? scalePoint(draft.importance, draft.effortMinutes) : null;
+
+  function closeDraft() {
+    setDraft(null);
+    setDraftTitle('');
+    setPlacingDetails(false);
+  }
 
   /**
    * Tapping the grid says both numbers at once.
@@ -42,9 +69,12 @@ export function QuadrantScreen({ tasks, areas }: { tasks: Task[]; areas: Area[] 
     const nextDraft = unplace(x, y);
     const tappedQuadrant = `${y < 50 ? 'top' : 'bottom'}-${x < 50 ? 'left' : 'right'}`;
     if (draft && quadrantFor(draft.importance, draft.effortMinutes) === tappedQuadrant) {
-      setDraft(null);
+      closeDraft();
       return;
     }
+    if (!draft) setDraftAreaId(areaFilter ?? areas[0]?.id ?? null);
+    setEditing(null);
+    setPlacingDetails(false);
     setDraft(nextDraft);
   }
 
@@ -94,6 +124,7 @@ export function QuadrantScreen({ tasks, areas }: { tasks: Task[]; areas: Area[] 
                 aria-selected={areaFilter === area.id}
                 onClick={() => {
                   setAreaFilter(area.id);
+                  if (draft) setDraftAreaId(area.id);
                   setFiltering(false);
                 }}
               >
@@ -107,17 +138,58 @@ export function QuadrantScreen({ tasks, areas }: { tasks: Task[]; areas: Area[] 
           <div className="axis-y">
             <span>Important + due</span>
           </div>
-          <div className="quadrant" onClick={tapGrid} role="presentation">
+          <div
+            className="quadrant"
+            onClick={tapGrid}
+            onMouseMove={(event) => {
+              const box = event.currentTarget.getBoundingClientRect();
+              setHoverPoint({
+                x: Math.min(100, Math.max(0, ((event.clientX - box.left) / box.width) * 100)),
+                y: Math.min(100, Math.max(0, ((event.clientY - box.top) / box.height) * 100)),
+              });
+            }}
+            onMouseLeave={() => setHoverPoint(null)}
+            role="presentation"
+          >
             {/* Top-left is tinted: important and quick, the place to look first. */}
             <div className="quadrant__hot" />
-            {draft ? (
+            {hoverPoint ? (
               <div
-                className={`quadrant__choice quadrant__choice--${quadrantFor(
-                  draft.importance,
-                  draft.effortMinutes,
-                )}`}
+                className="quadrant__hover"
+                style={
+                  {
+                    '--hover-x': `${hoverPoint.x}%`,
+                    '--hover-y': `${hoverPoint.y}%`,
+                    '--hover-colour': draftArea?.colour ?? selectedArea?.colour ?? 'var(--accent)',
+                  } as React.CSSProperties
+                }
                 aria-hidden
-              />
+              >
+                <span className="quadrant__hover-v" />
+                <span className="quadrant__hover-h" />
+              </div>
+            ) : null}
+            {draft && draftPoint ? (
+              <div
+                className="quadrant__selection"
+                style={
+                  {
+                    '--selection-x': `${draftPoint.x}%`,
+                    '--selection-y': `${draftPoint.y}%`,
+                    '--selection-colour':
+                      draftArea?.colour ?? selectedArea?.colour ?? 'var(--accent)',
+                  } as React.CSSProperties
+                }
+                aria-hidden
+              >
+                <span className="quadrant__selection-v" />
+                <span className="quadrant__selection-h" />
+                <span className="quadrant__selection-dot" />
+                <span className="quadrant__selection-label">
+                  {importanceLabel(draft.importance).toLowerCase()} ·{' '}
+                  {effortLabel(draft.effortMinutes)}
+                </span>
+              </div>
             ) : null}
             <div className="quadrant__vline" />
             <div className="quadrant__hline" />
@@ -131,7 +203,7 @@ export function QuadrantScreen({ tasks, areas }: { tasks: Task[]; areas: Area[] 
                 key={task.id}
                 task={task}
                 onEdit={() => {
-                  setDraft(null);
+                  closeDraft();
                   setEditing(task);
                 }}
               />
@@ -145,19 +217,77 @@ export function QuadrantScreen({ tasks, areas }: { tasks: Task[]; areas: Area[] 
           <span>24 h</span>
         </div>
 
-        {draft ? (
+        {draft && !placingDetails ? (
+          <form
+            className="quadrant-compose"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (draftTitle.trim()) setPlacingDetails(true);
+            }}
+          >
+            <div className="quadrant-compose__head">
+              <span>New task here</span>
+              <span>
+                {importanceLabel(draft.importance)} · {effortLabel(draft.effortMinutes)}
+              </span>
+            </div>
+            <input
+              className="quadrant-compose__input"
+              value={draftTitle}
+              onChange={(event) => setDraftTitle(event.target.value)}
+              placeholder="What needs doing?"
+              aria-label="New task title"
+              enterKeyHint="next"
+              autoComplete="off"
+              autoFocus
+            />
+            <div className="quadrant-compose__areas" aria-label="Focus area">
+              {areas.map((area) => (
+                <button
+                  type="button"
+                  key={area.id}
+                  className={`quadrant-compose__area${
+                    draftAreaId === area.id ? ' quadrant-compose__area--on' : ''
+                  }`}
+                  style={{ '--area-colour': area.colour } as React.CSSProperties}
+                  onClick={() => setDraftAreaId(area.id)}
+                >
+                  <span className="dot" style={{ background: area.colour }} />
+                  {area.name}
+                </button>
+              ))}
+              <button
+                type="button"
+                className={`quadrant-compose__area${
+                  draftAreaId === null ? ' quadrant-compose__area--on' : ''
+                }`}
+                style={{ '--area-colour': '#8a8a90' } as React.CSSProperties}
+                onClick={() => setDraftAreaId(null)}
+              >
+                <span className="dot" style={{ background: '#8a8a90' }} />
+                Unfiled
+              </button>
+            </div>
+          </form>
+        ) : null}
+
+        {draft && placingDetails ? (
           <TaskForm
             areas={areas}
+            googleMapsApiKey={googleMapsApiKey}
+            initialTitle={draftTitle.trim()}
+            initialAreaId={draftAreaId}
             importance={draft.importance}
             effortMinutes={draft.effortMinutes}
             onQuadrantChange={setDraft}
-            onDone={() => setDraft(null)}
+            onDone={closeDraft}
           />
         ) : null}
 
         {editing ? (
           <TaskForm
             areas={areas}
+            googleMapsApiKey={googleMapsApiKey}
             importance={editing.importance}
             effortMinutes={editing.effortMinutes}
             task={editing}
@@ -180,7 +310,7 @@ export function QuadrantScreen({ tasks, areas }: { tasks: Task[]; areas: Area[] 
                   <TaskRow
                     task={task}
                     onEdit={() => {
-                      setDraft(null);
+                      closeDraft();
                       setEditing(task);
                     }}
                   />
@@ -192,6 +322,16 @@ export function QuadrantScreen({ tasks, areas }: { tasks: Task[]; areas: Area[] 
       </div>
     </>
   );
+}
+
+function scalePoint(importance: number, effortMinutes: number) {
+  const minutes = Math.min(Math.max(effortMinutes, MIN_EFFORT_MINUTES), MAX_EFFORT_MINUTES);
+  const x =
+    ((Math.log(minutes) - Math.log(MIN_EFFORT_MINUTES)) /
+      (Math.log(MAX_EFFORT_MINUTES) - Math.log(MIN_EFFORT_MINUTES))) *
+    100;
+  const weight = (importance - 1) / 3;
+  return { x: 6 + x * 0.88, y: 6 + (1 - weight) * 88 };
 }
 
 function TaskDot({ task, onEdit }: { task: Task; onEdit: () => void }) {

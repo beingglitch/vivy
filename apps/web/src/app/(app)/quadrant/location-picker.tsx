@@ -53,7 +53,6 @@ interface MapsWindow extends Window {
   __vivyGoogleMapsReady?: () => void;
 }
 
-const API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? '';
 const INDIA: Coordinates = { lat: 20.5937, lng: 78.9629 };
 let mapsPromise: Promise<GoogleMapsApi> | null = null;
 
@@ -73,7 +72,7 @@ function currentLocation(): Promise<Coordinates | null> {
   });
 }
 
-function loadGoogleMaps(): Promise<GoogleMapsApi> {
+function loadGoogleMaps(apiKey: string): Promise<GoogleMapsApi> {
   const mapsWindow = window as MapsWindow;
   if (mapsWindow.google?.maps.Map) return Promise.resolve(mapsWindow.google.maps);
   if (mapsPromise) return mapsPromise;
@@ -87,7 +86,7 @@ function loadGoogleMaps(): Promise<GoogleMapsApi> {
 
     const script = document.createElement('script');
     script.src =
-      `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(API_KEY)}` +
+      `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}` +
       '&loading=async&libraries=maps,geocoding&v=weekly&callback=__vivyGoogleMapsReady';
     script.async = true;
     script.onerror = () => reject(new Error('Could not load Google Maps.'));
@@ -98,11 +97,13 @@ function loadGoogleMaps(): Promise<GoogleMapsApi> {
 }
 
 export function LocationPicker({
+  apiKey,
   value,
   radius,
   onChoose,
   onClose,
 }: {
+  apiKey: string;
   value: PickedPlace | null;
   radius: number;
   onChoose: (place: PickedPlace, radius: number) => void;
@@ -114,17 +115,20 @@ export function LocationPicker({
   const label = useRef(value?.label ?? 'Pinned location');
   const [picked, setPicked] = useState<PickedPlace | null>(value);
   const [selectedRadius, setSelectedRadius] = useState(radius);
+  const [customRadius, setCustomRadius] = useState(
+    !RADII.some((option) => option.value === radius),
+  );
   const [query, setQuery] = useState('');
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!API_KEY || !mapElement.current) return;
+    if (!apiKey || !mapElement.current) return;
     let active = true;
     let idleListener: GoogleListener | null = null;
     let dragListener: GoogleListener | null = null;
 
-    void Promise.all([loadGoogleMaps(), value ? Promise.resolve(null) : currentLocation()])
+    void Promise.all([loadGoogleMaps(apiKey), value ? Promise.resolve(null) : currentLocation()])
       .then(([maps, deviceLocation]) => {
         if (!active || !mapElement.current) return;
         const center = value ?? deviceLocation ?? INDIA;
@@ -166,7 +170,7 @@ export function LocationPicker({
       idleListener?.remove();
       dragListener?.remove();
     };
-  }, [value]);
+  }, [apiKey, value]);
 
   async function search() {
     const address = query.trim();
@@ -202,7 +206,7 @@ export function LocationPicker({
         </button>
       </div>
 
-      {API_KEY ? (
+      {apiKey ? (
         <>
           <form
             className="map-picker__search"
@@ -231,7 +235,7 @@ export function LocationPicker({
         </>
       ) : (
         <div className="map-picker__missing">
-          Add <code>NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</code> to enable map search and selection.
+          Add <code>GOOGLE_MAPS_API_KEY</code> to enable map search and selection.
         </div>
       )}
 
@@ -241,13 +245,43 @@ export function LocationPicker({
           <button
             type="button"
             key={option.value}
-            className={`chip${selectedRadius === option.value ? ' chip--on' : ''}`}
-            onClick={() => setSelectedRadius(option.value)}
+            className={`chip${!customRadius && selectedRadius === option.value ? ' chip--on' : ''}`}
+            onClick={() => {
+              setSelectedRadius(option.value);
+              setCustomRadius(false);
+            }}
           >
             {option.label}
           </button>
         ))}
+        <button
+          type="button"
+          className={`chip${customRadius ? ' chip--on' : ''}`}
+          onClick={() => setCustomRadius(true)}
+        >
+          Custom
+        </button>
       </div>
+      {customRadius ? (
+        <label className="map-picker__custom-radius">
+          <input
+            className="field__input"
+            type="number"
+            inputMode="numeric"
+            min={25}
+            max={50_000}
+            step={25}
+            value={selectedRadius}
+            onChange={(event) => {
+              const value = Number(event.target.value);
+              if (Number.isFinite(value)) setSelectedRadius(value);
+            }}
+            onBlur={() => setSelectedRadius((current) => Math.min(50_000, Math.max(25, current)))}
+            aria-label="Custom alert radius in metres"
+          />
+          <span>metres</span>
+        </label>
+      ) : null}
 
       {picked ? (
         <p className="map-picker__coords">
@@ -259,7 +293,7 @@ export function LocationPicker({
       <button
         type="button"
         className="btn btn--primary map-picker__choose"
-        disabled={!picked}
+        disabled={!picked || selectedRadius < 25 || selectedRadius > 50_000}
         onClick={() => picked && onChoose(picked, selectedRadius)}
       >
         Use this place

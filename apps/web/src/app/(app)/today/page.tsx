@@ -15,6 +15,8 @@ export default async function TodayPage({
   searchParams: Promise<{ day?: string }>;
 }) {
   const userId = await requirePageUserId();
+  const googleMapsApiKey =
+    process.env.GOOGLE_MAPS_API_KEY ?? process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? '';
   const params = await searchParams;
   const currentDay = dayKey(new Date());
   const selectedDay = /^\d{4}-\d{2}-\d{2}$/.test(params.day ?? '') ? params.day! : currentDay;
@@ -24,9 +26,17 @@ export default async function TodayPage({
     listTasks(userId, 'done'),
     listAreas(userId),
   ]);
-  const open = allOpen.filter((task) => dayKey(task.dueAt ?? new Date()) === selectedDay);
+  const activeAreaIds = new Set(areas.map((area) => area.id));
+  const belongsToActiveArea = (task: (typeof allOpen)[number]) =>
+    task.areaId === null || activeAreaIds.has(task.areaId);
+  const open = allOpen.filter(
+    (task) => belongsToActiveArea(task) && dayKey(task.dueAt ?? new Date()) === selectedDay,
+  );
   const done = allDone.filter(
-    (task) => task.completedAt !== null && dayKey(task.completedAt) === selectedDay,
+    (task) =>
+      belongsToActiveArea(task) &&
+      task.completedAt !== null &&
+      dayKey(task.completedAt) === selectedDay,
   );
 
   const today = new Date(`${selectedDay}T12:00:00`).toLocaleDateString('en-GB', {
@@ -54,7 +64,13 @@ export default async function TodayPage({
       </div>
 
       <div className="screen screen--flush">
-        <TodayScreen open={open} done={done} areas={areas} day={selectedDay} />
+        <TodayScreen
+          open={open}
+          done={done}
+          areas={areas}
+          day={selectedDay}
+          googleMapsApiKey={googleMapsApiKey}
+        />
       </div>
 
       <TodayDock />

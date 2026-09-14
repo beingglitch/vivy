@@ -1,7 +1,13 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { archiveArea, createArea, deleteAreaPermanently, updateArea } from '@/lib/areas';
+import {
+  archiveArea,
+  createArea,
+  deleteAreaPermanently,
+  restoreArea,
+  updateArea,
+} from '@/lib/areas';
 import { requireUserId } from '@/lib/session';
 
 /**
@@ -10,7 +16,7 @@ import { requireUserId } from '@/lib/session';
  * authorisation.
  */
 
-export type Result = { ok: true } | { ok: false; error: string };
+export type Result = { ok: true; areaId?: string } | { ok: false; error: string };
 
 function refresh() {
   revalidatePath('/');
@@ -19,11 +25,16 @@ function refresh() {
   revalidatePath('/today');
 }
 
-export async function addArea(name: string, colour: string): Promise<Result> {
+export async function addArea(
+  name: string,
+  colour: string,
+  cadenceDays: number,
+  showOnHome: boolean,
+): Promise<Result> {
   try {
-    await createArea(await requireUserId(), name, colour);
+    const areaId = await createArea(await requireUserId(), name, colour, cadenceDays, showOnHome);
     refresh();
-    return { ok: true };
+    return { ok: true, areaId };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : 'Could not save.' };
   }
@@ -31,7 +42,7 @@ export async function addArea(name: string, colour: string): Promise<Result> {
 
 export async function editArea(
   areaId: string,
-  patch: { name?: string; colour?: string },
+  patch: { name?: string; colour?: string; cadenceDays?: number; showOnHome?: boolean },
 ): Promise<Result> {
   try {
     await updateArea(await requireUserId(), areaId, patch);
@@ -42,9 +53,9 @@ export async function editArea(
   }
 }
 
-export async function removeArea(areaId: string): Promise<Result> {
+export async function removeArea(areaId: string, moveOpenTasksTo?: string | null): Promise<Result> {
   try {
-    await archiveArea(await requireUserId(), areaId);
+    await archiveArea(await requireUserId(), areaId, moveOpenTasksTo);
     refresh();
     return { ok: true };
   } catch {
@@ -52,9 +63,22 @@ export async function removeArea(areaId: string): Promise<Result> {
   }
 }
 
-export async function deleteArea(areaId: string): Promise<Result> {
+export async function resumeArea(areaId: string): Promise<Result> {
   try {
-    await deleteAreaPermanently(await requireUserId(), areaId);
+    await restoreArea(await requireUserId(), areaId);
+    refresh();
+    return { ok: true };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'Could not resume that area.',
+    };
+  }
+}
+
+export async function deleteArea(areaId: string, moveOpenTasksTo: string | null): Promise<Result> {
+  try {
+    await deleteAreaPermanently(await requireUserId(), areaId, moveOpenTasksTo);
     refresh();
     return { ok: true };
   } catch {

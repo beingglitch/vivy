@@ -1,4 +1,12 @@
+import { loadEnvFile } from 'node:process';
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'drizzle-kit';
+
+try {
+  loadEnvFile(fileURLToPath(new URL('../../.env.local', import.meta.url)));
+} catch (error) {
+  if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) throw error;
+}
 
 export default defineConfig({
   schema: './src/schema.ts',

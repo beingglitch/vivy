@@ -5,23 +5,25 @@ import { ChevronIcon, MoreIcon, PlusIcon } from '@/components/icons';
 import { AREA_COLOURS } from '@/lib/area-colours';
 import type { Area } from '@/lib/areas';
 import type { Task } from '@/lib/tasks';
-import { addArea, deleteArea, editArea, removeArea } from './actions';
+import { addArea, deleteArea, editArea, removeArea, resumeArea } from './actions';
 
 type Sheet = 'create' | 'edit' | 'delete' | null;
 
 export function AreasScreen({
   areas,
+  allAreas,
   openTasks,
   doneTasks,
 }: {
   areas: Area[];
+  allAreas: Area[];
   openTasks: Task[];
   doneTasks: Task[];
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [sheet, setSheet] = useState<Sheet>(null);
-  const [managing, setManaging] = useState(false);
-  const selected = areas.find((area) => area.id === selectedId) ?? null;
+  const [managing, setManaging] = useState(true);
+  const selected = allAreas.find((area) => area.id === selectedId) ?? null;
   const usedColours = areas.map((area) => area.colour);
 
   if (selected) {
@@ -45,6 +47,8 @@ export function AreasScreen({
         {sheet === 'delete' ? (
           <DeleteAreaSheet
             area={selected}
+            doneTasks={doneTasks.filter((task) => task.areaId === selected.id).length}
+            targetAreas={areas.filter((area) => area.id !== selected.id)}
             onDone={() => {
               setSheet(null);
               setSelectedId(null);
@@ -93,6 +97,7 @@ export function AreasScreen({
               >
                 <span className="dot" style={{ background: area.colour }} />
                 <span className="area-index__name">{area.name}</span>
+                <span className="area-index__cadence">{cadenceLabel(area.cadenceDays)}</span>
                 <span className="area-index__status">
                   {area.openTasks === 0 ? 'clear' : `${area.openTasks} open`}
                 </span>
@@ -115,13 +120,19 @@ export function AreasScreen({
       ) : null}
       {managing ? (
         <ManageAreas
-          areas={areas}
+          areas={allAreas}
+          doneTasks={doneTasks}
           onDone={() => setManaging(false)}
           onNew={() => setSheet('create')}
           onEdit={(areaId) => {
             setSelectedId(areaId);
             setManaging(false);
             setSheet('edit');
+          }}
+          onDelete={(areaId) => {
+            setSelectedId(areaId);
+            setManaging(false);
+            setSheet('delete');
           }}
         />
       ) : null}
@@ -131,18 +142,24 @@ export function AreasScreen({
 
 function ManageAreas({
   areas,
+  doneTasks,
   onDone,
   onNew,
   onEdit,
+  onDelete,
 }: {
   areas: Area[];
+  doneTasks: Task[];
   onDone: () => void;
   onNew: () => void;
   onEdit: (areaId: string) => void;
+  onDelete: (areaId: string) => void;
 }) {
   const [pendingId, setPendingId] = useState<string | null>(null);
+  const [revealedId, setRevealedId] = useState<string | null>(null);
   const [order, setOrder] = useState(areas.map((area) => area.id));
   const draggingId = useRef<string | null>(null);
+  const swiping = useRef<{ areaId: string; x: number; y: number } | null>(null);
   const [, start] = useTransition();
   const orderedAreas = order.flatMap((id) => {
     const area = areas.find((candidate) => candidate.id === id);
@@ -157,6 +174,14 @@ function ManageAreas({
     });
   }
 
+  function resume(areaId: string) {
+    setPendingId(areaId);
+    start(async () => {
+      await resumeArea(areaId);
+      setPendingId(null);
+    });
+  }
+
   function moveArea(source: string, target: string) {
     if (source === target) return;
     setOrder((current) => {
@@ -167,59 +192,138 @@ function ManageAreas({
     });
   }
 
+  const activeAreas = orderedAreas.filter((area) => area.archivedAt === null);
+  const pausedAreas = orderedAreas.filter((area) => area.archivedAt !== null);
+
+  function areaRow(area: Area) {
+    const paused = area.archivedAt !== null;
+    const revealed = revealedId === area.id;
+    const activity = areaActivity(area, doneTasks);
+    return (
+      <div className="manage-area-swipe" data-area-id={area.id} key={area.id}>
+        <div className="manage-area-swipe__actions" aria-hidden={!revealed}>
+          <button
+            type="button"
+            tabIndex={revealed ? 0 : -1}
+            onClick={() => (paused ? resume(area.id) : archive(area.id))}
+          >
+            {paused ? <PlayIcon /> : <PauseIcon />}
+            <span>{paused ? 'Resume' : 'Pause'}</span>
+          </button>
+          <button
+            type="button"
+            className="manage-area-swipe__delete"
+            tabIndex={revealed ? 0 : -1}
+            onClick={() => onDelete(area.id)}
+          >
+            <TrashIcon />
+            <span>Delete</span>
+          </button>
+        </div>
+        <div
+          className={`manage-area-row${paused ? ' manage-area-row--paused' : ''}${
+            revealed ? ' manage-area-row--revealed' : ''
+          }`}
+        >
+          <button
+            type="button"
+            className="manage-area-row__drag"
+            aria-label={`Drag ${area.name}`}
+            onPointerDown={(event) => {
+              draggingId.current = area.id;
+              event.currentTarget.setPointerCapture(event.pointerId);
+            }}
+            onPointerMove={(event) => {
+              const target = document
+                .elementFromPoint(event.clientX, event.clientY)
+                ?.closest<HTMLElement>('[data-area-id]')?.dataset['areaId'];
+              if (target && draggingId.current) moveArea(draggingId.current, target);
+            }}
+            onPointerUp={() => {
+              draggingId.current = null;
+            }}
+            onPointerCancel={() => {
+              draggingId.current = null;
+            }}
+          >
+            <DragIcon />
+          </button>
+          <span
+            className="dot"
+            style={{
+              background: paused || activity.cold ? 'var(--line-6)' : area.colour,
+            }}
+          />
+          <button
+            type="button"
+            className="manage-area-row__body"
+            onPointerDown={(event) => {
+              swiping.current = { areaId: area.id, x: event.clientX, y: event.clientY };
+            }}
+            onPointerUp={(event) => {
+              const gesture = swiping.current;
+              swiping.current = null;
+              if (!gesture || gesture.areaId !== area.id) return;
+              const distance = event.clientX - gesture.x;
+              if (Math.abs(event.clientY - gesture.y) > 12) return;
+              if (distance < -48) return setRevealedId(area.id);
+              if (distance > 30 || revealed) return setRevealedId(null);
+              onEdit(area.id);
+            }}
+            onPointerCancel={() => {
+              swiping.current = null;
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                onEdit(area.id);
+              }
+            }}
+          >
+            <strong>{area.name}</strong>
+            <span>
+              {paused
+                ? `paused ${area.archivedAt?.toLocaleDateString('en-GB', {
+                    day: 'numeric',
+                    month: 'short',
+                  })} · ${area.totalTasks} tasks kept`
+                : `${cadenceLabel(area.cadenceDays)} · ${activity.label}`}
+            </span>
+          </button>
+          <button
+            type="button"
+            className={`area-switch${paused ? '' : ' area-switch--on'}`}
+            disabled={pendingId === area.id}
+            aria-label={`${paused ? 'Resume' : 'Pause'} ${area.name}`}
+            onClick={() => (paused ? resume(area.id) : archive(area.id))}
+          >
+            <span />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="manage-areas">
       <div className="manage-areas__header">
         <div>
           <h1 className="title">Manage areas</h1>
-          <span className="subtitle">Drag to reorder · switch to archive</span>
+          <span className="subtitle">Drag to reorder · switch to pause</span>
         </div>
         <button type="button" onClick={onDone}>
           Done
         </button>
       </div>
       <div className="manage-areas__list">
-        {orderedAreas.map((area) => (
-          <div className="manage-area-row" data-area-id={area.id} key={area.id}>
-            <button
-              type="button"
-              className="manage-area-row__drag"
-              aria-label={`Drag ${area.name}`}
-              onPointerDown={(event) => {
-                draggingId.current = area.id;
-                event.currentTarget.setPointerCapture(event.pointerId);
-              }}
-              onPointerMove={(event) => {
-                const target = document
-                  .elementFromPoint(event.clientX, event.clientY)
-                  ?.closest<HTMLElement>('[data-area-id]')?.dataset['areaId'];
-                if (target && draggingId.current) moveArea(draggingId.current, target);
-              }}
-              onPointerUp={() => {
-                draggingId.current = null;
-              }}
-              onPointerCancel={() => {
-                draggingId.current = null;
-              }}
-            >
-              <DragIcon />
-            </button>
-            <span className="dot" style={{ background: area.colour }} />
-            <button type="button" className="manage-area-row__body" onClick={() => onEdit(area.id)}>
-              <strong>{area.name}</strong>
-              <span>{area.openTasks === 0 ? 'nothing open' : `${area.openTasks} open tasks`}</span>
-            </button>
-            <button
-              type="button"
-              className="area-switch area-switch--on"
-              disabled={pendingId === area.id}
-              aria-label={`Archive ${area.name}`}
-              onClick={() => archive(area.id)}
-            >
-              <span />
-            </button>
+        {activeAreas.map(areaRow)}
+        {pausedAreas.length > 0 ? (
+          <div className="manage-areas__paused-label">
+            <span>Paused</span>
+            <span>{pausedAreas.length}</span>
           </div>
-        ))}
+        ) : null}
+        {pausedAreas.map(areaRow)}
       </div>
       <button type="button" className="manage-areas__new" onClick={onNew}>
         <PlusIcon size={16} />
@@ -363,13 +467,17 @@ function AreaForm({
   const [colour, setColour] = useState(
     area?.colour ?? AREA_COLOURS.find((option) => !usedColours.includes(option)) ?? AREA_COLOURS[0],
   );
+  const [cadenceDays, setCadenceDays] = useState(area?.cadenceDays ?? 7);
+  const [showOnHome, setShowOnHome] = useState(area?.showOnHome ?? true);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
   function save() {
     setError(null);
     start(async () => {
-      const result = area ? await editArea(area.id, { name, colour }) : await addArea(name, colour);
+      const result = area
+        ? await editArea(area.id, { name, colour, cadenceDays, showOnHome })
+        : await addArea(name, colour, cadenceDays, showOnHome);
       if (!result.ok) return setError(result.error);
       onDone();
     });
@@ -394,6 +502,31 @@ function AreaForm({
         />
         <p className="area-sheet__hint">Ongoing, no end date. Tasks go inside it.</p>
 
+        <span className="area-sheet__label">Cadence</span>
+        <div className="area-sheet__options">
+          {[
+            { value: 1, label: 'Daily' },
+            { value: 7, label: 'Weekly' },
+            { value: 30, label: 'Monthly' },
+          ].map((option) => (
+            <button
+              type="button"
+              key={option.value}
+              className={option.value === cadenceDays ? 'area-sheet__option--on' : ''}
+              onClick={() => setCadenceDays(option.value)}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+        <p className="area-sheet__hint">
+          {cadenceDays === 1
+            ? 'Goes cold after two missed days.'
+            : cadenceDays === 7
+              ? 'Goes cold after two missed weeks.'
+              : 'Goes cold after two missed months.'}
+        </p>
+
         <span className="area-sheet__label">Colour</span>
         <div className="area-sheet__swatches">
           {AREA_COLOURS.filter(
@@ -408,6 +541,21 @@ function AreaForm({
               onClick={() => setColour(option)}
             />
           ))}
+        </div>
+
+        <div className="area-sheet__home">
+          <span>
+            <strong>Show on Home</strong>
+            <small>Adds a heatmap row for this area</small>
+          </span>
+          <button
+            type="button"
+            className={`area-switch${showOnHome ? ' area-switch--on' : ''}`}
+            aria-label={`${showOnHome ? 'Hide from' : 'Show on'} Home`}
+            onClick={() => setShowOnHome((current) => !current)}
+          >
+            <span />
+          </button>
         </div>
 
         {error ? <p className="pair__error">{error}</p> : null}
@@ -431,21 +579,29 @@ function AreaForm({
 
 function DeleteAreaSheet({
   area,
+  doneTasks,
+  targetAreas,
   onDone,
   onCancel,
 }: {
   area: Area;
+  doneTasks: number;
+  targetAreas: Area[];
   onDone: () => void;
   onCancel: () => void;
 }) {
   const [choice, setChoice] = useState<'archive' | 'delete'>('archive');
+  const [targetAreaId, setTargetAreaId] = useState<string | null>(targetAreas[0]?.id ?? null);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
   function confirm() {
     setError(null);
     start(async () => {
-      const result = choice === 'archive' ? await removeArea(area.id) : await deleteArea(area.id);
+      const result =
+        choice === 'archive'
+          ? await removeArea(area.id, targetAreaId)
+          : await deleteArea(area.id, targetAreaId);
       if (!result.ok) return setError(result.error);
       onDone();
     });
@@ -457,7 +613,8 @@ function DeleteAreaSheet({
         <div className="sheet-handle" aria-hidden />
         <h2>Delete {area.name}?</h2>
         <p>
-          {area.openTasks} open task{area.openTasks === 1 ? '' : 's'} belong to this area.
+          {area.openTasks} open and {doneTasks} closed task{doneTasks === 1 ? '' : 's'} belong to
+          this area.
         </p>
         <button
           type="button"
@@ -467,7 +624,7 @@ function DeleteAreaSheet({
           <span className="delete-choice__radio" />
           <span>
             <strong>Archive it</strong>
-            <small>Keeps its tasks and history.</small>
+            <small>Keeps its history, hides it from active views, and can be resumed.</small>
           </span>
         </button>
         <button
@@ -478,9 +635,31 @@ function DeleteAreaSheet({
           <span className="delete-choice__radio" />
           <span>
             <strong>Delete permanently</strong>
-            <small>Tasks become unfiled. This cannot be undone.</small>
+            <small>History and closed tasks go too. This cannot be undone.</small>
           </span>
         </button>
+        {area.openTasks > 0 ? (
+          <div className="delete-area-sheet__move">
+            <span>
+              <strong>
+                Move {area.openTasks} open task{area.openTasks === 1 ? '' : 's'} to
+              </strong>
+              <small>They keep their quadrant position</small>
+            </span>
+            <select
+              value={targetAreaId ?? ''}
+              onChange={(event) => setTargetAreaId(event.target.value || null)}
+              aria-label="Move open tasks to"
+            >
+              <option value="">Unfiled</option>
+              {targetAreas.map((target) => (
+                <option key={target.id} value={target.id}>
+                  {target.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : null}
         {error ? <p className="pair__error">{error}</p> : null}
         <div className="delete-area-sheet__actions">
           <button type="button" className="btn btn--quiet" onClick={onCancel}>
@@ -500,6 +679,40 @@ function formatEffort(minutes: number) {
   const hours = Math.floor(minutes / 60);
   const remainder = minutes % 60;
   return remainder ? `${hours}h ${remainder}m` : `${hours}h`;
+}
+
+function cadenceLabel(days: number | null) {
+  if (days === 1) return 'daily';
+  if (days === 7) return 'weekly';
+  if (days === 30) return 'monthly';
+  return 'ongoing';
+}
+
+function areaActivity(area: Area, doneTasks: Task[]) {
+  const completions = doneTasks
+    .filter((task) => task.areaId === area.id && task.completedAt)
+    .map((task) => task.completedAt!)
+    .sort((left, right) => right.getTime() - left.getTime());
+  const latest = completions[0];
+  if (!latest) {
+    return {
+      cold: false,
+      label:
+        area.openTasks === 0
+          ? 'nothing open'
+          : `${area.openTasks} open task${area.openTasks === 1 ? '' : 's'}`,
+    };
+  }
+
+  const today = new Date();
+  today.setHours(12, 0, 0, 0);
+  const latestDay = new Date(latest);
+  latestDay.setHours(12, 0, 0, 0);
+  const daysAgo = Math.max(0, Math.round((today.getTime() - latestDay.getTime()) / 86_400_000));
+  const cadenceDays = area.cadenceDays ?? 7;
+  if (daysAgo === 0) return { cold: false, label: 'touched today' };
+  if (daysAgo > cadenceDays * 2) return { cold: true, label: `cold ${daysAgo} days` };
+  return { cold: false, label: `touched ${daysAgo} day${daysAgo === 1 ? '' : 's'} ago` };
 }
 
 function BackIcon() {
@@ -533,6 +746,49 @@ function DragIcon() {
       aria-hidden
     >
       <path d="M4 9h16M4 15h16" />
+    </svg>
+  );
+}
+
+function PauseIcon() {
+  return (
+    <svg
+      width="17"
+      height="17"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      aria-hidden
+    >
+      <path d="M9 5v14M15 5v14" />
+    </svg>
+  );
+}
+
+function PlayIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <path d="m8 5 11 7-11 7z" />
+    </svg>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg
+      width="17"
+      height="17"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M5 7h14M9 7V5h6v2M6.5 7l1 12h9l1-12" />
     </svg>
   );
 }

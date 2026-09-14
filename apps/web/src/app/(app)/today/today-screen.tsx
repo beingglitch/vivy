@@ -21,11 +21,13 @@ export function TodayScreen({
   done,
   areas,
   day,
+  googleMapsApiKey,
 }: {
   open: Task[];
   done: Task[];
   areas: Area[];
   day: string;
+  googleMapsApiKey: string;
 }) {
   const [editing, setEditing] = useState<Task | null>(null);
   const router = useRouter();
@@ -91,6 +93,7 @@ export function TodayScreen({
       {editing ? (
         <TaskForm
           areas={areas}
+          googleMapsApiKey={googleMapsApiKey}
           importance={editing.importance}
           effortMinutes={editing.effortMinutes}
           task={editing}

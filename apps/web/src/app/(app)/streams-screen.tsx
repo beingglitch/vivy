@@ -62,7 +62,11 @@ function streaks(values: number[]) {
 
 function initialPreferences(streams: StreamRow[]): Preferences {
   const visibleKeys = streams
-    .filter((stream) => stream.kind === 'metric' && stream.values.some((value) => value > 0))
+    .filter(
+      (stream) =>
+        stream.kind === 'area' ||
+        (stream.kind === 'metric' && stream.values.some((value) => value > 0)),
+    )
     .map((stream) => stream.key);
   return {
     visibleKeys,
@@ -90,7 +94,15 @@ export function StreamsScreen({ streams }: { streams: StreamRow[] }) {
       ) as Partial<Preferences> | null;
       const validKeys = new Set(streams.map((stream) => stream.key));
       if (saved) {
-        const visibleKeys = (saved.visibleKeys ?? []).filter((key) => validKeys.has(key));
+        const accountVisibleKeys = streams
+          .filter((stream) => stream.kind === 'area')
+          .map((stream) => stream.key);
+        const visibleKeys = [
+          ...new Set([
+            ...(saved.visibleKeys ?? []).filter((key) => validKeys.has(key)),
+            ...accountVisibleKeys,
+          ]),
+        ];
         const order = [
           ...(saved.order ?? []).filter((key) => visibleKeys.includes(key)),
           ...visibleKeys.filter((key) => !(saved.order ?? []).includes(key)),

@@ -12,7 +12,10 @@ const Env = z.object({
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required - see .env.example'),
   VIVY_PAIRING_SECRET: z
     .string()
-    .min(32, 'VIVY_PAIRING_SECRET must be at least 32 chars; generate with `openssl rand -base64 32`'),
+    .min(
+      32,
+      'VIVY_PAIRING_SECRET must be at least 32 chars; generate with `openssl rand -base64 32`',
+    ),
 
   ANTHROPIC_API_KEY: z.string().optional(),
 
@@ -20,6 +23,7 @@ const Env = z.object({
   VAPID_PUBLIC_KEY: z.string().optional(),
   VAPID_PRIVATE_KEY: z.string().optional(),
   VAPID_SUBJECT: z.string().optional(),
+  GOOGLE_MAPS_API_KEY: z.string().optional(),
   NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: z.string().optional(),
   CRON_SECRET: z.string().optional(),
 
@@ -27,7 +31,10 @@ const Env = z.object({
    * Development shortcut: when set, every signup code is this value and no email
    * is sent. Unset it and real six-digit codes are generated instead.
    */
-  DEV_OTP_CODE: z.string().regex(/^\d{6}$/).optional(),
+  DEV_OTP_CODE: z
+    .string()
+    .regex(/^\d{6}$/)
+    .optional(),
   YOUTUBE_API_KEY: z.string().optional(),
   KITE_API_KEY: z.string().optional(),
   KITE_API_SECRET: z.string().optional(),

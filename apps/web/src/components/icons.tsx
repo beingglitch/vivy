@@ -43,8 +43,21 @@ export const SendIcon = ({ size = 18 }: P) => (
   </svg>
 );
 
+export const AiIcon = ({ size = 20 }: P) => (
+  <svg {...base(size)} strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 2.8c.8 4.5 2.7 6.4 7.2 7.2-4.5.8-6.4 2.7-7.2 7.2-.8-4.5-2.7-6.4-7.2-7.2 4.5-.8 6.4-2.7 7.2-7.2z" />
+    <path d="M19 16.5c.3 1.8 1.2 2.7 3 3-1.8.3-2.7 1.2-3 3-.3-1.8-1.2-2.7-3-3 1.8-.3 2.7-1.2 3-3z" />
+  </svg>
+);
+
 export const ChevronIcon = ({ size = 15 }: P) => (
-  <svg {...base(size)} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" stroke="#C4C4C8">
+  <svg
+    {...base(size)}
+    strokeWidth={2}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    stroke="#C4C4C8"
+  >
     <path d="m9 5 7 7-7 7" />
   </svg>
 );
@@ -98,6 +111,22 @@ export const MoneyIcon = ({ size = 21 }: P) => (
   <svg {...base(size)} strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round">
     <path d="M3 17.5 8.5 11l4 3L20 5.5" />
     <path d="M14.5 5.5H20v5.5" />
+  </svg>
+);
+
+export const FocusAreaIcon = ({ size = 21 }: P) => (
+  <svg {...base(size)} strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="7" cy="7" r="2.5" />
+    <circle cx="17" cy="7" r="2.5" />
+    <circle cx="7" cy="17" r="2.5" />
+    <circle cx="17" cy="17" r="2.5" />
+  </svg>
+);
+
+export const LearningIcon = ({ size = 21 }: P) => (
+  <svg {...base(size)} strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round">
+    <path d="M4 5.5h6.2c1 0 1.8.8 1.8 1.8V20c0-1.1-.9-2-2-2H4z" />
+    <path d="M20 5.5h-6.2c-1 0-1.8.8-1.8 1.8V20c0-1.1.9-2 2-2h6z" />
   </svg>
 );
 

@@ -80,7 +80,8 @@ export const users = pgTable(
     preferredLogin: text('preferred_login').notNull().default('passphrase'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [uniqueIndex('users_email_idx').on(t.email)]);
+  (t) => [uniqueIndex('users_email_idx').on(t.email)],
+);
 
 /**
  * Email verification codes, for both signup and passphrase reset.
@@ -103,7 +104,8 @@ export const emailVerifications = pgTable(
     attempts: integer('attempts').notNull().default(0),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index('email_verifications_expiry_idx').on(t.expiresAt)]);
+  (t) => [index('email_verifications_expiry_idx').on(t.expiresAt)],
+);
 
 /**
  * Invite codes.
@@ -141,7 +143,8 @@ export const invites = pgTable(
   (t) => [
     uniqueIndex('invites_code_idx').on(t.codeHash),
     index('invites_creator_idx').on(t.createdBy),
-  ]);
+  ],
+);
 
 /**
  * Every grant of access, in order. The renewal history for an account.
@@ -173,7 +176,8 @@ export const inviteRedemptions = pgTable(
     userId: uuid('user_id').notNull(),
     redeemedAt: timestamp('redeemed_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [primaryKey({ columns: [t.inviteId, t.userId] })]);
+  (t) => [primaryKey({ columns: [t.inviteId, t.userId] })],
+);
 
 /** Browser sessions. Hashed like device tokens, for the same reason. */
 export const sessions = pgTable(
@@ -185,7 +189,8 @@ export const sessions = pgTable(
     expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
     userAgent: text('user_agent'),
   },
-  (t) => [index('sessions_expiry_idx').on(t.expiresAt), index('sessions_user_idx').on(t.userId)]);
+  (t) => [index('sessions_expiry_idx').on(t.expiresAt), index('sessions_user_idx').on(t.userId)],
+);
 
 /**
  * Onboarding progress, one row per user per ingest source.
@@ -209,7 +214,8 @@ export const onboardingSteps = pgTable(
   (t) => [
     primaryKey({ columns: [t.userId, t.sourceId] }),
     index('onboarding_scheduled_idx').on(t.scheduledFor),
-  ]);
+  ],
+);
 
 /** Web push endpoints, so a scheduled reminder can reach a closed app. */
 export const pushSubscriptions = pgTable(
@@ -221,7 +227,8 @@ export const pushSubscriptions = pgTable(
     auth: text('auth').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index('push_user_idx').on(t.userId)]);
+  (t) => [index('push_user_idx').on(t.userId)],
+);
 
 /** A paired device. Tokens are stored hashed - a DB dump must not yield a credential. */
 export const devices = pgTable(
@@ -246,7 +253,8 @@ export const devices = pgTable(
   (t) => [
     uniqueIndex('devices_token_hash_idx').on(t.tokenHash),
     index('devices_user_idx').on(t.userId),
-  ]);
+  ],
+);
 
 export const rawRecords = pgTable(
   'raw_records',
@@ -268,7 +276,8 @@ export const rawRecords = pgTable(
     uniqueIndex('raw_dedupe_idx').on(t.userId, t.dedupeKey),
     index('raw_seq_idx').on(t.userId, t.seq),
     index('raw_source_ts_idx').on(t.userId, t.source, t.ts),
-  ]);
+  ],
+);
 
 export const events = pgTable(
   'events',
@@ -295,7 +304,8 @@ export const events = pgTable(
     // The rollup job's access pattern: one user, one type, a date range.
     index('events_type_date_idx').on(t.userId, t.type, t.localDate),
     index('events_raw_idx').on(t.rawId),
-  ]);
+  ],
+);
 
 /** Accounts, in the accounting sense: anything that holds or owes value. */
 export const accounts = pgTable(
@@ -312,7 +322,8 @@ export const accounts = pgTable(
     includeInNetworth: boolean('include_in_networth').notNull().default(true),
     archivedAt: timestamp('archived_at', { withTimezone: true }),
   },
-  (t) => [index('accounts_user_idx').on(t.userId)]);
+  (t) => [index('accounts_user_idx').on(t.userId)],
+);
 
 /** Money that moved. Minor units throughout - see the note in @vivy/core payloads. */
 export const txns = pgTable(
@@ -339,7 +350,8 @@ export const txns = pgTable(
     uniqueIndex('txns_dedupe_idx').on(t.userId, t.dedupeKey),
     index('txns_account_date_idx').on(t.userId, t.accountId, t.localDate),
     index('txns_confidence_idx').on(t.userId, t.confidence),
-  ]);
+  ],
+);
 
 /**
  * Authoritative balances. These anchor the ledger; transactions fill between them.
@@ -356,7 +368,8 @@ export const balanceSnapshots = pgTable(
     authority: text('authority').notNull(), // statement | broker-api | cas | manual | sms-inferred
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [primaryKey({ columns: [t.userId, t.accountId, t.asOf, t.authority] })]);
+  (t) => [primaryKey({ columns: [t.userId, t.accountId, t.asOf, t.authority] })],
+);
 
 export const holdings = pgTable(
   'holdings',
@@ -369,7 +382,8 @@ export const holdings = pgTable(
     quantity: numeric('quantity', { precision: 20, scale: 6 }).notNull(),
     avgCostMinor: integer('avg_cost_minor'),
   },
-  (t) => [primaryKey({ columns: [t.userId, t.accountId, t.asOf, t.symbol] })]);
+  (t) => [primaryKey({ columns: [t.userId, t.accountId, t.asOf, t.symbol] })],
+);
 
 /**
  * Daily closing prices. NSE bhavcopy for equities, AMFI for mutual fund NAVs.
@@ -385,7 +399,8 @@ export const prices = pgTable(
     closeMinor: integer('close_minor').notNull(),
     sourceName: text('source_name').notNull(),
   },
-  (t) => [primaryKey({ columns: [t.symbol, t.onDate] })]);
+  (t) => [primaryKey({ columns: [t.symbol, t.onDate] })],
+);
 
 /**
  * The aggregate every chart reads.
@@ -407,7 +422,8 @@ export const metricsDaily = pgTable(
   (t) => [
     primaryKey({ columns: [t.userId, t.localDate, t.stream] }),
     index('metrics_stream_idx').on(t.userId, t.stream),
-  ]);
+  ],
+);
 
 /**
  * What Vivy has already told you.
@@ -427,7 +443,8 @@ export const observations = pgTable(
     surfacedAt: timestamp('surfaced_at', { withTimezone: true }),
     dismissedAt: timestamp('dismissed_at', { withTimezone: true }),
   },
-  (t) => [index('observations_subject_idx').on(t.userId, t.subject, t.localDate)]);
+  (t) => [index('observations_subject_idx').on(t.userId, t.subject, t.localDate)],
+);
 
 /**
  * Failed authentication attempts, per email.
@@ -468,12 +485,15 @@ export const areas = pgTable(
      * something that can go stale, like "Admin".
      */
     cadenceDays: integer('cadence_days'),
+    /** Whether this area's stream is visible on Home for every signed-in device. */
+    showOnHome: boolean('show_on_home').notNull().default(true),
     /** Archived rather than deleted, so tasks that referenced it still read. */
     archivedAt: timestamp('archived_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [uniqueIndex('areas_user_name_idx').on(t.userId, t.name)]);
+  (t) => [uniqueIndex('areas_user_name_idx').on(t.userId, t.name)],
+);
 
 /**
  * Tasks.
@@ -538,4 +558,5 @@ export const tasks = pgTable(
   (t) => [
     index('tasks_user_status_idx').on(t.userId, t.status),
     index('tasks_area_idx').on(t.userId, t.areaId),
-  ]);
+  ],
+);
