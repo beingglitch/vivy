@@ -21,6 +21,7 @@ export interface AndroidRelease {
    * short-lived signed link that needs no auth of its own.
    */
   assetApiUrl: string;
+  assetName: string;
   sizeBytes: number;
   publishedAt: string;
   notes: string;
@@ -43,9 +44,9 @@ interface GhRelease {
   assets: GhAsset[];
 }
 
-/** `owner/repo`. Without it there is nothing to query, and the UI says so. */
-function repo(): string | null {
-  return process.env['VIVY_GITHUB_REPO'] ?? null;
+/** `owner/repo`. Forks can override the repository without changing code. */
+function repo(): string {
+  return process.env['VIVY_GITHUB_REPO']?.trim() || 'beingglitch/vivy';
 }
 
 /**
@@ -71,28 +72,20 @@ function parseAsset(assets: GhAsset[]): { asset: GhAsset; versionCode: number } 
  * has a different fix, so each gets its own name.
  */
 export type ReleaseProblem =
-  | 'no-repo'
-  | 'no-token'
-  | 'unauthorized'
-  | 'no-access'
-  | 'no-release'
-  | 'no-asset'
-  | 'unreachable';
+  'no-token' | 'unauthorized' | 'no-access' | 'no-release' | 'no-asset' | 'unreachable';
 
 export type ReleaseLookup =
-  | { ok: true; release: AndroidRelease }
-  | { ok: false; problem: ReleaseProblem };
+  { ok: true; release: AndroidRelease } | { ok: false; problem: ReleaseProblem };
 
 /** What each problem means, in words meant for the person who has to fix it. */
 export const RELEASE_PROBLEMS: Record<ReleaseProblem, string> = {
-  'no-repo': 'Set VIVY_GITHUB_REPO to owner/repo, then redeploy.',
   'no-token':
     'The repo is private, so GITHUB_TOKEN is required. Use a fine-grained token with Contents: read.',
   unauthorized:
     'GitHub refused the token. Check it has Contents: read on this repo and has not expired.',
   'no-access':
     'The token cannot see this repo. Check VIVY_GITHUB_REPO is right, and that the token grants Contents: read on it.',
-  'no-release': 'No release published yet. Tag one: git tag android-v0.1.0 && git push --follow-tags',
+  'no-release': 'No Android release published yet. Push a tag matching android-v<version>.',
   'no-asset':
     'The release has no APK named vivy-<version>-<versionCode>.apk. Check the workflow finished.',
   unreachable: 'Could not reach GitHub. It may be a transient outage.',
@@ -100,19 +93,18 @@ export const RELEASE_PROBLEMS: Record<ReleaseProblem, string> = {
 
 export async function lookupAndroidRelease(): Promise<ReleaseLookup> {
   const slug = repo();
-  if (!slug) return { ok: false, problem: 'no-repo' };
-
   const token = process.env['GITHUB_TOKEN'];
   const headers: Record<string, string> = {
     Accept: 'application/vnd.github+json',
     'User-Agent': 'vivy',
+    'X-GitHub-Api-Version': '2022-11-28',
   };
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
   try {
-    const response = await fetch(`https://api.github.com/repos/${slug}/releases/latest`, {
+    const response = await fetch(`https://api.github.com/repos/${slug}/releases?per_page=100`, {
       headers,
-      next: { revalidate: 600 },
+      cache: 'no-store',
     });
 
     if (!response.ok) {
@@ -133,8 +125,12 @@ export async function lookupAndroidRelease(): Promise<ReleaseLookup> {
       return { ok: false, problem: 'unreachable' };
     }
 
-    const release = (await response.json()) as GhRelease;
-    if (release.draft) return { ok: false, problem: 'no-release' };
+    const releases = (await response.json()) as GhRelease[];
+    const release = releases.find(
+      (candidate) =>
+        !candidate.draft && !candidate.prerelease && /^android-v\d/.test(candidate.tag_name),
+    );
+    if (!release) return { ok: false, problem: 'no-release' };
 
     const found = parseAsset(release.assets);
     if (!found) return { ok: false, problem: 'no-asset' };
@@ -145,6 +141,7 @@ export async function lookupAndroidRelease(): Promise<ReleaseLookup> {
         versionName: release.tag_name.replace(/^android-v?/, ''),
         versionCode: found.versionCode,
         assetApiUrl: found.asset.url,
+        assetName: found.asset.name,
         sizeBytes: found.asset.size,
         publishedAt: release.published_at,
         notes: release.body?.trim() ?? '',
@@ -163,8 +160,9 @@ async function canSeeRepo(slug: string, token: string): Promise<boolean> {
         Accept: 'application/vnd.github+json',
         Authorization: `Bearer ${token}`,
         'User-Agent': 'vivy',
+        'X-GitHub-Api-Version': '2022-11-28',
       },
-      next: { revalidate: 600 },
+      cache: 'no-store',
     });
     return response.ok;
   } catch {
@@ -179,38 +177,31 @@ export async function latestAndroidRelease(): Promise<AndroidRelease | null> {
 }
 
 /**
- * Resolve an asset to a link the phone can actually fetch.
+ * Open a private release asset with the server-side GitHub token.
  *
- * GitHub answers an authenticated asset request with a redirect to signed
- * object storage. That signed url carries its own short-lived credential, so
- * handing it to the client is what keeps a 7 MB download out of a serverless
- * function while still working for a private repo.
+ * GitHub normally redirects to signed object storage. It may also stream the
+ * asset directly, so the route supports both responses instead of treating a
+ * valid 200 response as a token failure.
  *
  * Returns null when there is no token, because a private repo without one
  * cannot be read at all and pretending otherwise produces a 404 with no clue
  * why.
  */
-export async function resolveDownloadUrl(assetApiUrl: string): Promise<string | null> {
+export async function fetchReleaseAsset(assetApiUrl: string): Promise<Response | null> {
   const token = process.env['GITHUB_TOKEN'];
   if (!token) return null;
 
   try {
-    const response = await fetch(assetApiUrl, {
+    return await fetch(assetApiUrl, {
       headers: {
         Accept: 'application/octet-stream',
         Authorization: `Bearer ${token}`,
         'User-Agent': 'vivy',
+        'X-GitHub-Api-Version': '2022-11-28',
       },
       redirect: 'manual',
       cache: 'no-store',
     });
-
-    const location = response.headers.get('location');
-    if (location) return location;
-
-    // A public repo answers 200 here instead of redirecting. Nothing to hand
-    // on, so the caller falls back to the browser url.
-    return null;
   } catch {
     return null;
   }

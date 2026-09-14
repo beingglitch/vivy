@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.vivy.collector.VivyApp
+import com.vivy.collector.collect.SmsInboxCollector
 import com.vivy.collector.collect.UsageCollector
 import com.vivy.collector.net.Api
 
@@ -29,6 +30,9 @@ class SyncWorker(context: Context, params: WorkerParameters) :
         // rather than starting from zero.
         if (app.settings.sendUsageNow()) {
             runCatching { UsageCollector.collect(applicationContext, app.db, app.settings) }
+        }
+        if (app.settings.sendSmsNow()) {
+            runCatching { SmsInboxCollector.collect(applicationContext, app.db, app.settings) }
         }
 
         // Paused keeps capturing and stops delivering. The queue is the whole

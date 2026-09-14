@@ -20,11 +20,11 @@ changes nothing.
 
 ### The minimum to boot
 
-| Variable | Why |
-| --- | --- |
-| `DATABASE_URL` | Neon Postgres. Everything else is optional. |
+| Variable            | Why                                                                                                                                     |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`      | Neon Postgres. Everything else is optional.                                                                                             |
 | `VIVY_ADMIN_EMAILS` | Comma-separated. An empty value means nobody can sign up, because only an admin can mint invite codes. Put your own address here first. |
-| `DEV_OTP_CODE` | Fixes the email code to this value and skips sending mail. Unset it in production or codes become guessable. |
+| `DEV_OTP_CODE`      | Fixes the email code to this value and skips sending mail. Unset it in production or codes become guessable.                            |
 
 Web push needs the VAPID trio; without it the toggle simply does nothing. There
 is no email provider wired up yet, which is why `DEV_OTP_CODE` exists: in
@@ -76,10 +76,10 @@ Production and Preview. Two differences from local:
 - **Set `CRON_SECRET`**. `vercel.json` schedules `/api/push/run` every fifteen
   minutes, and the route rejects calls without a matching Bearer token so it
   cannot be triggered by anyone who finds the URL.
-- **Set `VIVY_GITHUB_REPO`** to `owner/repo`, and **`GITHUB_TOKEN`** to a
-  fine-grained personal access token with `Contents: read` on that repo. The
-  repo is private, so both are required: without the token GitHub returns 404
-  for the release and the download button answers 503 saying so. The token is
+- **Set `GITHUB_TOKEN`** to a fine-grained personal access token with
+  `Contents: read` on `beingglitch/vivy`. Set `VIVY_GITHUB_REPO` only when a
+  fork should provide the APK. Without the token GitHub returns 404 for the
+  private release and the download button explains the problem. The token is
   read server side only and never reaches the browser or the phone.
 
 `NEXT_PUBLIC_VAPID_PUBLIC_KEY` must match `VAPID_PUBLIC_KEY`. It is the same

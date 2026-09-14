@@ -9,6 +9,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import java.util.UUID
 
 private val Context.dataStore by preferencesDataStore(name = "vivy")
 
@@ -25,9 +26,12 @@ class Settings(private val context: Context) {
         val endpoint = stringPreferencesKey("endpoint")
         val deviceId = stringPreferencesKey("device_id")
         val token = stringPreferencesKey("token")
+        val installationId = stringPreferencesKey("installation_id")
         val lastSync = longPreferencesKey("last_sync")
         /** How far usage stats have been read, so a window is never counted twice. */
         val usageCursor = longPreferencesKey("usage_cursor")
+        /** Highest inbox row inspected by the SMS backfill. */
+        val smsCursor = longPreferencesKey("sms_cursor")
         /** Who is signed in. Shown in the UI so the phone can say whose data this is. */
         val email = stringPreferencesKey("email")
         /** Per-collector switches. Absent means on: a fresh install collects what it may. */
@@ -76,7 +80,13 @@ class Settings(private val context: Context) {
     suspend fun wifiOnlyNow(): Boolean = context.dataStore.data.first()[Keys.wifiOnly] ?: false
 
     suspend fun clear() {
-        context.dataStore.edit { it.clear() }
+        context.dataStore.edit {
+            it.remove(Keys.endpoint)
+            it.remove(Keys.deviceId)
+            it.remove(Keys.token)
+            it.remove(Keys.email)
+            it.remove(Keys.lastSync)
+        }
     }
 
     suspend fun credentials(): Triple<String, String, String>? {
@@ -96,5 +106,23 @@ class Settings(private val context: Context) {
 
     suspend fun setUsageCursor(value: Long) {
         context.dataStore.edit { it[Keys.usageCursor] = value }
+    }
+
+    suspend fun smsCursor(): Long = context.dataStore.data.first()[Keys.smsCursor] ?: 0L
+
+    suspend fun setSmsCursor(value: Long) {
+        context.dataStore.edit { it[Keys.smsCursor] = value }
+    }
+
+    suspend fun installationId(): String {
+        val existing = context.dataStore.data.first()[Keys.installationId]
+        if (!existing.isNullOrBlank()) return existing
+        val created = UUID.randomUUID().toString()
+        context.dataStore.edit { preferences ->
+            if (preferences[Keys.installationId].isNullOrBlank()) {
+                preferences[Keys.installationId] = created
+            }
+        }
+        return context.dataStore.data.first()[Keys.installationId] ?: created
     }
 }

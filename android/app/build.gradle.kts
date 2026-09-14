@@ -14,8 +14,8 @@ android {
         applicationId = "com.vivy.collector"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.2.0"
 
         // Where the app syncs to, baked in so there is nothing to type on a
         // phone keyboard. Overridable in the app for local development, and
@@ -79,4 +79,6 @@ dependencies {
     implementation(libs.work.runtime)
     implementation(libs.serialization.json)
     implementation(libs.datastore)
+
+    testImplementation(libs.junit)
 }

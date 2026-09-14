@@ -32,7 +32,7 @@ export function AndroidApp({
           {problem ? RELEASE_PROBLEMS[problem] : 'No build available yet.'}
         </p>
         {problem === 'no-release' ? (
-          <code className="ob__cmd">git tag android-v0.1.0 &amp;&amp; git push --follow-tags</code>
+          <code className="ob__cmd">git tag android-v0.2.0 &amp;&amp; git push --follow-tags</code>
         ) : null}
       </section>
     );
@@ -86,15 +86,14 @@ export function AndroidApp({
       </div>
 
       <p className="src__controlNote">
-        Sideloaded, not from the Play Store. Play forbids reading bank messages for anything that
-        is not your default messaging app, which is the whole reason the app exists.
+        Sideloaded, not from the Play Store. Play forbids reading bank messages for anything that is
+        not your default messaging app, which is the whole reason the app exists.
       </p>
 
       {phones.length > 0 ? (
         <ul className="apk__phones">
           {phones.map((p) => {
-            const stale =
-              p.appVersionCode !== null && p.appVersionCode < release.versionCode;
+            const stale = p.appVersionCode !== null && p.appVersionCode < release.versionCode;
             return (
               <li key={p.id} className="apk__phone">
                 <span className="apk__phoneName">{p.label}</span>

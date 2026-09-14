@@ -62,19 +62,6 @@ class VivyApp : Application() {
         WorkManager.getInstance(this).enqueue(OneTimeWorkRequestBuilder<SyncWorker>().build())
     }
 
-    /**
-     * The device id, from a context that cannot suspend.
-     *
-     * Only called from the SMS receiver, which is already off the main thread
-     * and needs the value to stamp a record it is about to store.
-     */
-    fun deviceIdBlocking(): String = runBlocking {
-        settings.credentials()?.second ?: "android-unpaired"
-    }
-
-    /** Same reason as above: the SMS receiver cannot suspend. */
-    fun sendSmsBlocking(): Boolean = runBlocking { settings.sendSmsNow() }
-
     companion object {
         const val WORK_NAME = "vivy-sync"
     }

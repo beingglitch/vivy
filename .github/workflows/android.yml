@@ -2,13 +2,7 @@ name: Android
 
 on:
   push:
-    branches: [main]
-    # Tag a release to get an APK attached to it:
-    #   git tag android-v0.1.0 && git push --tags
     tags: ['android-v*']
-  pull_request:
-    paths: ['android/**', '.github/workflows/android.yml']
-  workflow_dispatch:
 
 concurrency:
   group: android-${{ github.ref }}
@@ -37,19 +31,35 @@ jobs:
       # which is most of the wall clock.
       - uses: gradle/actions/setup-gradle@v4
 
-      - name: Build release APK
-        run: ./gradlew assembleRelease --no-daemon
-
-      # The filename carries the version code, because that is what the app
-      # compares when it checks for an update. Keeping it in the name rather
-      # than a side file keeps a release to one artifact.
-      - name: Name the artifact after its version
+      - name: Verify tagged version
         id: name
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          name=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
-          code=$(grep -oP 'versionCode = \K\d+' app/build.gradle.kts)
+          name=$(sed -n 's/.*versionName = "\([^"]*\)".*/\1/p' app/build.gradle.kts)
+          code=$(sed -n 's/.*versionCode = \([0-9]*\).*/\1/p' app/build.gradle.kts)
+          tagged=${GITHUB_REF_NAME#android-v}
+          test -n "$name"
+          test -n "$code"
+          if [[ ! "$GITHUB_REF_NAME" =~ ^android-v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Tag must look like android-v0.2.0" >&2
+            exit 1
+          fi
+          if [ "$tagged" != "$name" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match versionName $name" >&2
+            exit 1
+          fi
+          previous=$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq \
+            '[.[].assets[].name | try capture("^vivy-.*-(?<code>[0-9]+)\\.apk$").code catch empty | tonumber] | max // 0')
+          if [ "$code" -le "$previous" ]; then
+            echo "versionCode $code must be greater than published build $previous" >&2
+            exit 1
+          fi
           echo "apk=vivy-${name}-${code}.apk" >> "$GITHUB_OUTPUT"
           echo "version=${name}" >> "$GITHUB_OUTPUT"
+
+      - name: Test and build release APK
+        run: ./gradlew testReleaseUnitTest assembleRelease --no-daemon
 
       - run: mv app/build/outputs/apk/release/app-release.apk "${{ steps.name.outputs.apk }}"
 
@@ -65,9 +75,10 @@ jobs:
       # reads the latest release, serves the APK at /api/android/download, and
       # the phone's update check compares against it.
       - name: Publish the release
-        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           name: Android ${{ steps.name.outputs.version }}
           files: android/${{ steps.name.outputs.apk }}
           generate_release_notes: true
+          fail_on_unmatched_files: true
+          make_latest: true

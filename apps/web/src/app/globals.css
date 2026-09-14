@@ -663,6 +663,34 @@ a {
 }
 
 /* --------------------------------------------------------------- money --- */
+.money-transactions {
+  border-top: 1px solid var(--line);
+}
+
+.money-transaction {
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  justify-content: space-between;
+  min-height: 68px;
+  padding: 10px 20px;
+}
+
+.money-transaction div {
+  display: grid;
+  gap: 4px;
+}
+
+.money-transaction strong,
+.money-transaction b {
+  color: var(--ink);
+  font-size: 15px;
+}
+
+.money-transaction span {
+  color: var(--muted);
+  font-size: 12px;
+}
 
 .networth {
   padding: 4px 20px 0;

@@ -63,7 +63,10 @@ class MainActivity : ComponentActivity() {
 
     private val requestPermissions = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
-    ) { refreshPermissions() }
+    ) { result ->
+        refreshPermissions()
+        if (result[Manifest.permission.READ_SMS] == true) app.syncNow()
+    }
 
     private val openUsageSettings = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult(),

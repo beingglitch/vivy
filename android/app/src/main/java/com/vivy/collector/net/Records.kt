@@ -1,5 +1,7 @@
 package com.vivy.collector.net
 
+import java.nio.charset.StandardCharsets
+import java.security.MessageDigest
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -44,6 +46,16 @@ fun dedupeKey(source: String, vararg parts: Any): String {
     }
     val tail = hash.toString(36).padStart(7, '0')
     return "$source:${natural.take(96)}:$tail"
+}
+
+fun privateDedupeKey(source: String, vararg parts: Any): String {
+    val digest = MessageDigest.getInstance("SHA-256")
+    parts.forEachIndexed { index, part ->
+        if (index > 0) digest.update(0)
+        digest.update(part.toString().toByteArray(StandardCharsets.UTF_8))
+    }
+    val hash = digest.digest().joinToString("") { "%02x".format(it) }
+    return "$source:$hash"
 }
 
 fun jsonEscape(value: String): String = buildString {

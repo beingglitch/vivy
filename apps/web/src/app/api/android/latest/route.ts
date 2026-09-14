@@ -23,7 +23,7 @@ export async function GET() {
 
     // The asset's API url is deliberately withheld. The phone downloads through
     // /api/android/download, so all it needs from here is the version.
-    const { assetApiUrl: _assetApiUrl, ...publicFields } = result.release;
+    const { assetApiUrl: _assetApiUrl, assetName: _assetName, ...publicFields } = result.release;
     return ok(publicFields);
   } catch (error) {
     return handleError(error);

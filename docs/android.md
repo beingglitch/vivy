@@ -7,10 +7,10 @@ and then it is quiet.
 
 ## What it captures
 
-| What | Permission | Notes |
-| --- | --- | --- |
-| Per-app foreground sessions | Usage access | Granted in system Settings, not a popup. Read on a cursor so a window is never counted twice. |
-| Bank transaction messages | RECEIVE_SMS, READ_SMS | Only messages carrying an amount and a transaction word. One-time codes are dropped before storage. |
+| What                        | Permission            | Notes                                                                                                                       |
+| --------------------------- | --------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Per-app foreground sessions | Usage access          | Granted in system Settings, not a popup. Read on a cursor so a window is never counted twice.                               |
+| Bank transaction messages   | RECEIVE_SMS, READ_SMS | Plausible financial short-code messages carrying an amount. One-time codes and non-transactions are dropped before storage. |
 
 Nothing else is read. There is no accessibility service in this build, so
 in-app content (which reel, which video) is not captured yet.
@@ -21,6 +21,15 @@ Every collector writes to a Room table called the outbox and nothing talks to
 the network directly. A WorkManager job runs every fifteen minutes, collects,
 then POSTs the batch to `/api/sync/push`. No signal, server down, battery saver
 killing the job: the only consequence is a longer queue.
+
+The first run after message permission backfills the previous 30 days, then an
+inbox cursor and the live receiver cover new messages. The raw sender and text
+are AES-256-GCM encrypted with an Android Keystore key before entering the
+outbox. A Kotlin parser emits a readable `money.txn` event with amount, account
+tail, direction, method, merchant, balance and confidence. The server stores the
+sealed raw record and materialises the event into the ledger and daily spend
+stream. OTPs, payment requests, future debits, offers, failures and reversals
+never enter the outbox.
 
 Sends are idempotent on `dedupeKey`, so a timeout mid-flight is resent rather
 than dropped. Synced rows older than thirty days are evicted; the server is the
@@ -113,13 +122,13 @@ only its SHA-256 hash is stored, so losing it means generating another.
 
 Everything the app sends has a switch on the main screen:
 
-| Control | What it does |
-| --- | --- |
-| App screen time | Off means usage is not collected at all, not merely not sent. |
-| Bank messages | Off means an incoming message is never written down. The receiver returns before storing. |
-| Pause sending | Keeps capturing, stops uploading. The queue holds until you turn it off. |
-| Wifi only | Waits for unmetered network instead of using mobile data. |
-| Sign out | Stops sending and forgets the token. Captured rows stay on the phone. |
+| Control         | What it does                                                                              |
+| --------------- | ----------------------------------------------------------------------------------------- |
+| App screen time | Off means usage is not collected at all, not merely not sent.                             |
+| Bank messages   | Off means an incoming message is never written down. The receiver returns before storing. |
+| Pause sending   | Keeps capturing, stops uploading. The queue holds until you turn it off.                  |
+| Wifi only       | Waits for unmetered network instead of using mobile data.                                 |
+| Sign out        | Stops sending and forgets the token. Captured rows stay on the phone.                     |
 
 Turning a collector off stops collection at the source. It does not remove
 anything already sent: delete that from Vivy on the web.
@@ -146,8 +155,12 @@ the device name does not match what the server issued.
 
 ## CI/CD
 
-`.github/workflows/android.yml` builds the APK on every push to `main` that
-touches `android/`, on pull requests, and on demand from the Actions tab.
+`.github/workflows/android.yml` builds only when a tag matching `android-v*` is
+pushed. Ordinary pushes to `main` and pull requests do not start an Android
+build. The workflow verifies that the tag matches `versionName`, runs Android
+unit tests, rejects a `versionCode` that is not newer than the published build,
+builds the release APK, uploads the artifact and publishes it as the latest
+GitHub release.
 
 **To get an APK from CI:** open the Actions tab, pick a run, download the `apk`
 artifact from the bottom of the run page. Artifacts are kept 90 days. That
@@ -157,16 +170,13 @@ download is the install path: open it on the phone.
 Bumping the version below for the exact steps.
 
 The workflow attaches the APK to a GitHub release, and that release is what the
-web app reads. On Vercel set:
-
-- `VIVY_GITHUB_REPO` to `owner/repo`
-- `GITHUB_TOKEN` to a fine-grained PAT with `Contents: read` on that repo
-
-Both are needed because the repo is private. A private release asset's public
-download link returns 404 to anyone without a session, so the web app exchanges
-it for a short-lived signed link instead, which the phone can fetch and which
-keeps the 7 MB transfer out of the serverless function. The token stays server
-side; it is never sent to the browser or the phone.
+web app reads. On Vercel set `GITHUB_TOKEN` to a fine-grained PAT with
+`Contents: read` on `beingglitch/vivy`. `VIVY_GITHUB_REPO` is optional and only
+needed for a fork. A private release asset's public download link returns 404
+to anyone without a session, so the web app exchanges it for a short-lived
+signed link instead, which the phone can fetch and which keeps the 7 MB transfer
+out of the serverless function. The token stays server side; it is never sent
+to the browser or the phone.
 
 Then `/api/android/download` serves the newest build and `/api/android/latest`
 answers update checks. Without the variables the settings page just tells you to
@@ -205,7 +215,7 @@ only value Android itself orders.
 ## Bumping the version
 
 `versionCode` in `app/build.gradle.kts` must increase for Android to treat a
-build as an update. It is `1` today. Increment it with every APK you install
+build as an update. Increment it with every APK you install
 over another, or the install is rejected.
 
 It is also what makes the whole update path work. The CI workflow reads it and

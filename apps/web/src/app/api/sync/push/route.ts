@@ -3,6 +3,7 @@ import { PushRequest, type PushResponse } from '@vivy/core';
 import { db, events as eventsTable, rawRecords } from '@vivy/db';
 import { authenticate, touchDevice } from '@/lib/auth';
 import { fail, handleError, ok, parseBody } from '@/lib/http';
+import { materializeMoneyEvents } from '@/lib/money-ingest';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -45,7 +46,8 @@ export async function POST(request: Request) {
             body: r.body,
             sealed: r.sealed,
             dedupeKey: r.dedupeKey,
-          })))
+          })),
+        )
         .onConflictDoNothing({ target: [rawRecords.userId, rawRecords.dedupeKey] })
         .returning({ id: rawRecords.id });
       acceptedRaw = inserted.length;
@@ -69,10 +71,12 @@ export async function POST(request: Request) {
             rawId: e.rawId,
             derivedBy: e.derivedBy,
             dedupeKey: e.dedupeKey,
-          })))
+          })),
+        )
         .onConflictDoNothing({ target: [eventsTable.userId, eventsTable.dedupeKey] })
         .returning({ id: eventsTable.id });
       acceptedEvents = inserted.length;
+      await materializeMoneyEvents(userId, body.events);
     }
 
     const submitted = body.raw.length + body.events.length;

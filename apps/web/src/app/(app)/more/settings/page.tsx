@@ -53,8 +53,7 @@ export default async function SettingsPage() {
         <section className="src__section">
           <span className="eyebrow">Default sign-in</span>
           <p className="src__controlNote">
-            Which method the sign-in screen opens on. Both always work, this only picks the
-            default.
+            Which method the sign-in screen opens on. Both always work, this only picks the default.
           </p>
           <LoginMethodPicker current={preferred} />
         </section>
@@ -63,18 +62,17 @@ export default async function SettingsPage() {
           <span className="eyebrow">Why they differ</span>
           <ul className="ob__list ob__list--muted">
             <li>
-              <strong>Passphrase</strong> proves you know the secret. It also derives the key that
-              decrypts your sealed raw data, so this is the only method that unlocks everything.
+              <strong>Passphrase</strong> proves you know the secret and is the recovery path for
+              encrypted streams once stream-key handoff is enabled.
             </li>
             <li>
-              <strong>Email code</strong> proves you control the inbox. Faster, nothing to
-              remember, and every chart, task and total works normally. Sealed raw data stays
-              locked until you enter the passphrase.
+              <strong>Email code</strong> proves you control the inbox. Faster, nothing to remember,
+              and every chart, task and total works normally.
             </li>
           </ul>
           <p className="src__controlNote">
-            Nothing is sealed yet, so the two are equivalent today. That changes once the Android
-            collector starts capturing screen text and bank messages.
+            Android bank-message bodies currently use a device-held key and are not readable on the
+            web. Their derived transactions and totals remain available after either sign-in.
           </p>
         </section>
 

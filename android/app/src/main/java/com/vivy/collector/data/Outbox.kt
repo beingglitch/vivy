@@ -46,6 +46,9 @@ interface OutboxDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun add(row: OutboxRow): Long
 
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun addAll(rows: List<OutboxRow>): List<Long>
+
     @Query("SELECT * FROM outbox WHERE synced_at IS NULL ORDER BY ts ASC LIMIT :limit")
     suspend fun pending(limit: Int): List<OutboxRow>
 

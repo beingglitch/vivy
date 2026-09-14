@@ -38,7 +38,7 @@ vivy/
 
 ```ts
 import { dedupeKey } from '@vivy/core/runtime'; // zero-dependency helpers
-import type { VivyEvent } from '@vivy/core';    // types, erased at compile time
+import type { VivyEvent } from '@vivy/core'; // types, erased at compile time
 ```
 
 Collectors use both and ship no validator. The server imports the barrel, because
@@ -120,15 +120,15 @@ Every screen in `apps/web/src/app/(app)/` is drawn from the canvas
 (`~/Downloads/Life Tracker Mobile.dc.html`), tokens, type scale and spacing
 lifted from it rather than approximated.
 
-| Route         | Screen       | Notes                                              |
-| ------------- | ------------ | -------------------------------------------------- |
-| `/`           | Home         | Four densities: year grid, 30-day, curve, bars     |
-| `/today`      | Today        | Carried-over work, then grouped by focus area      |
-| `/quadrant`   | Quadrant     | Importance × time-to-finish, with an unplaced tray |
-| `/money`      | Money        | Net worth, spend & income, review prompt           |
-| `/more/areas` | Focus areas  | 30-day strip per area                              |
-| `/vivy`       | Vivy         | Chat with undoable write cards                     |
-| `/status`     | Ingest status| Dev instrument, not a designed screen              |
+| Route         | Screen        | Notes                                              |
+| ------------- | ------------- | -------------------------------------------------- |
+| `/`           | Home          | Four densities: year grid, 30-day, curve, bars     |
+| `/today`      | Today         | Carried-over work, then grouped by focus area      |
+| `/quadrant`   | Quadrant      | Importance × time-to-finish, with an unplaced tray |
+| `/money`      | Money         | Net worth, spend & income, review prompt           |
+| `/more/areas` | Focus areas   | 30-day strip per area                              |
+| `/vivy`       | Vivy          | Chat with undoable write cards                     |
+| `/status`     | Ingest status | Dev instrument, not a designed screen              |
 
 Two rules the design is strict about, easy to undo by accident:
 
@@ -145,7 +145,10 @@ identical cells. Swap for real rollups once collectors have pushed.
 
 ## Status
 
-P1 (log, sync, extension) and the designed screens are built and green. The
-money engine (`@vivy/money`) is tested but not yet wired to a collector. P2 is
-the Android SMS reader, which needs a month of real bank messages as its spec.
+P1 (log, sync, extension) and the designed screens are built and green. P2 now
+includes the Android SMS receiver, 30-day inbox backfill, sealed raw capture,
+on-device transaction parsing, ledger materialisation and spend rollups. Parser
+templates still need expansion against real bank wording as new unmatched
+messages are observed.
+
 # vivy
