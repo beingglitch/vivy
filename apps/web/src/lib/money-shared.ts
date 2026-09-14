@@ -61,6 +61,8 @@ export interface MoneyTransaction {
 export interface MoneyPoint {
   date: string;
   netWorthMinor: number;
+  assetsMinor: number;
+  liabilitiesMinor: number;
   spendMinor: number;
   incomeMinor: number;
 }

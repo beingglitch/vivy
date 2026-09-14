@@ -80,6 +80,14 @@ export async function getMoneyDashboard(userId: string): Promise<MoneyDashboard>
   }));
 
   const points = datedBalances.map(({ date, balances: dayBalances }) => {
+    const assetsMinor = accountRows.reduce((total, account) => {
+      if (!account.includeInNetworth || account.isLiability) return total;
+      return total + (dayBalances.get(account.id) ?? 0);
+    }, 0);
+    const liabilitiesMinor = accountRows.reduce((total, account) => {
+      if (!account.includeInNetworth || !account.isLiability) return total;
+      return total - (dayBalances.get(account.id) ?? 0);
+    }, 0);
     const netWorthMinor = accountRows.reduce((total, account) => {
       if (!account.includeInNetworth) return total;
       const balance = dayBalances.get(account.id) ?? 0;
@@ -89,6 +97,8 @@ export async function getMoneyDashboard(userId: string): Promise<MoneyDashboard>
     return {
       date,
       netWorthMinor,
+      assetsMinor,
+      liabilitiesMinor,
       spendMinor: dayTransactions
         .filter((transaction) => transaction.direction === 'debit')
         .reduce((total, transaction) => total + transaction.amountMinor, 0),
@@ -134,6 +144,7 @@ export async function createMoneyAccount(
   }
   validateMoney(input.balanceMinor);
   const creditLimitMinor = validateCreditLimit(input.kind, input.creditLimitMinor);
+  validateCreditBalance(input.kind, input.balanceMinor, creditLimitMinor);
   validateDate(input.asOf);
 
   const id = randomUUID();
@@ -188,6 +199,9 @@ export async function updateMoneyAccount(
   }
   const isLiability = liabilityKind(input.kind);
   const creditLimitMinor = validateCreditLimit(input.kind, input.creditLimitMinor);
+  if (input.balanceMinor !== undefined) {
+    validateCreditBalance(input.kind, input.balanceMinor, creditLimitMinor);
+  }
 
   await db().transaction(async (transaction) => {
     await transaction
@@ -464,6 +478,15 @@ function validateCreditLimit(kind: string, value?: number | null): number | null
   if (value === null || value === undefined) throw new Error('Enter the card maximum limit.');
   validateMoney(value, false);
   return value;
+}
+
+function validateCreditBalance(
+  kind: string,
+  balanceMinor: number,
+  creditLimitMinor: number | null,
+) {
+  if (kind !== 'credit-card' || creditLimitMinor === null) return;
+  if (balanceMinor > creditLimitMinor) throw new Error('Card spending cannot exceed its limit.');
 }
 
 async function requireAccount(userId: string, accountId: string): Promise<void> {

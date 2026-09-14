@@ -22,6 +22,7 @@ import {
 type Sheet = 'add-menu' | 'account' | 'account-detail' | 'transaction' | 'review' | null;
 type Range = '1m' | '6m' | '1y' | 'all';
 type BarRange = 'daily' | 'monthly' | 'yearly';
+type CreditEntry = 'spent' | 'remaining';
 
 export function MoneyScreen({ dashboard }: { dashboard: MoneyDashboard }) {
   const [sheet, setSheet] = useState<Sheet>(null);
@@ -211,7 +212,9 @@ export function MoneyScreen({ dashboard }: { dashboard: MoneyDashboard }) {
           dashboard.accounts.map((account) => (
             <button
               type="button"
-              className="money-account-row"
+              className={`money-account-row${
+                account.includeInNetworth ? '' : ' money-account-row--excluded'
+              }`}
               key={account.id}
               onClick={() => {
                 setSelectedAccountId(account.id);
@@ -337,11 +340,82 @@ export function MoneyScreen({ dashboard }: { dashboard: MoneyDashboard }) {
 }
 
 function NetWorthChart({ points }: { points: MoneyPoint[] }) {
+  const chart = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const element = chart.current;
+    if (element) element.scrollLeft = element.scrollWidth;
+  }, [points]);
+  if (points.length === 0) return <div className="money-chart money-chart--empty" />;
+
+  const series = [
+    {
+      key: 'liabilities',
+      label: 'Liabilities',
+      className: 'money-chart__line--liabilities',
+      values: points.map((point) => point.liabilitiesMinor),
+    },
+    {
+      key: 'assets',
+      label: 'Assets',
+      className: 'money-chart__line--assets',
+      values: points.map((point) => point.assetsMinor),
+    },
+    {
+      key: 'net-worth',
+      label: 'Net worth',
+      className: 'money-chart__line--net-worth',
+      values: points.map((point) => point.netWorthMinor),
+    },
+  ] as const;
+  const values = series.flatMap((entry) => entry.values);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const width = Math.max(340, Math.min(920, points.length * 5));
+  const coordinates = series.map((entry) => ({
+    ...entry,
+    points: entry.values.map((value, index) => ({
+      x: points.length === 1 ? width / 2 : (index / (points.length - 1)) * (width - 28) + 14,
+      y: 120 - ((value - min) / Math.max(1, max - min)) * 88,
+    })),
+  }));
+  const netWorth = coordinates[2]!;
+  const netWorthLast = netWorth.points.at(-1)!;
+
   return (
-    <MoneyLineChart
-      points={points.map((point) => ({ date: point.date, value: point.netWorthMinor }))}
-      label="Scrollable net worth chart"
-    />
+    <>
+      <div className="money-chart-legend" aria-label="Chart lines">
+        {series.map((entry) => (
+          <span key={entry.key} className={entry.className}>
+            <i /> {entry.label}
+          </span>
+        ))}
+      </div>
+      <div
+        ref={chart}
+        className="money-chart money-chart--portfolio"
+        tabIndex={0}
+        aria-label="Scrollable net worth, assets and liabilities chart"
+      >
+        <svg viewBox={`0 0 ${width} 145`} style={{ width }} role="img">
+          {coordinates.map((entry) => (
+            <path
+              key={entry.key}
+              className={`money-chart__line ${entry.className}`}
+              d={smoothPath(entry.points)}
+            />
+          ))}
+          <circle className="money-chart__halo" cx={netWorthLast.x} cy={netWorthLast.y} r="8" />
+          <circle className="money-chart__dot" cx={netWorthLast.x} cy={netWorthLast.y} r="4" />
+          <text
+            className="money-chart__label"
+            x={Math.max(38, netWorthLast.x - 25)}
+            y={netWorthLast.y - 14}
+          >
+            {compactInr(netWorth.values.at(-1) ?? 0)}
+          </text>
+        </svg>
+      </div>
+    </>
   );
 }
 
@@ -424,7 +498,9 @@ function AccountDetail({
                 ? 'Amount owed'
                 : 'Balance'}
           </span>
-          <strong>{formatInr(account.balanceMinor)}</strong>
+          <strong className={shownInNetWorth ? '' : 'money-amount--excluded'}>
+            {formatInr(account.balanceMinor)}
+          </strong>
           <small className={change > 0 && account.isLiability ? 'money-negative' : ''}>
             {change > 0 ? '+' : ''}
             {formatInr(change)} in this period
@@ -582,18 +658,30 @@ function AccountSheet({
   const [creditLimit, setCreditLimit] = useState(
     account?.creditLimitMinor ? String(account.creditLimitMinor / 100) : '',
   );
+  const [creditEntry, setCreditEntry] = useState<CreditEntry>('spent');
   const [asOf, setAsOf] = useState(today());
   const [include, setInclude] = useState(account?.includeInNetworth ?? true);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
   function save() {
-    const balanceMinor = amountToMinor(balance);
-    if (balanceMinor === null) return setError('Enter a valid balance.');
+    const enteredMinor = amountToMinor(balance);
+    if (enteredMinor === null) return setError('Enter a valid amount.');
     const creditLimitMinor = kind === 'credit-card' ? amountToMinor(creditLimit) : null;
     if (kind === 'credit-card' && !creditLimitMinor) {
       return setError('Enter the card maximum limit.');
     }
+    if (creditLimitMinor !== null && enteredMinor > creditLimitMinor) {
+      return setError(
+        creditEntry === 'spent'
+          ? 'Spent amount cannot exceed the card limit.'
+          : 'Remaining credit cannot exceed the card limit.',
+      );
+    }
+    const balanceMinor =
+      kind === 'credit-card' && creditEntry === 'remaining' && creditLimitMinor !== null
+        ? creditLimitMinor - enteredMinor
+        : enteredMinor;
     start(async () => {
       const result = account
         ? await editMoneyAccount(account.id, {
@@ -619,6 +707,19 @@ function AccountSheet({
     });
   }
 
+  function chooseCreditEntry(next: CreditEntry) {
+    if (next === creditEntry) return;
+    const amountMinor = amountToMinor(balance);
+    const limitMinor = amountToMinor(creditLimit);
+    setCreditEntry(next);
+    setBalance(
+      amountMinor !== null && limitMinor !== null && amountMinor <= limitMinor
+        ? String((limitMinor - amountMinor) / 100)
+        : '',
+    );
+    setError(null);
+  }
+
   return (
     <MoneySheet title={account ? 'Edit account' : 'New account'} onClose={onClose}>
       <label className="money-field">
@@ -639,13 +740,33 @@ function AccountSheet({
         <span>Last 4 digits (optional)</span>
         <input value={ref} inputMode="numeric" onChange={(event) => setRef(event.target.value)} />
       </label>
+      {kind === 'credit-card' ? (
+        <div className="money-credit-entry" aria-label="Credit card amount type">
+          <button
+            type="button"
+            className={creditEntry === 'spent' ? 'money-pill--on' : ''}
+            onClick={() => chooseCreditEntry('spent')}
+          >
+            Enter spent
+          </button>
+          <button
+            type="button"
+            className={creditEntry === 'remaining' ? 'money-pill--on' : ''}
+            onClick={() => chooseCreditEntry('remaining')}
+          >
+            Enter remaining
+          </button>
+        </div>
+      ) : null}
       <div className="money-field-row">
         <label className="money-field">
           <span>
             {kind === 'personal-debt'
               ? 'Amount still owed'
               : kind === 'credit-card'
-                ? 'Spent / outstanding'
+                ? creditEntry === 'spent'
+                  ? 'Spent / outstanding'
+                  : 'Remaining credit'
                 : 'Balance'}
           </span>
           <input
@@ -685,8 +806,8 @@ function AccountSheet({
       ) : null}
       {kind === 'credit-card' ? (
         <p className="money-field-hint">
-          Card spending increases outstanding debt. Payments reduce it; only outstanding debt is
-          subtracted from net worth.
+          Enter either spent or remaining credit. Vivy derives the other from the maximum limit;
+          only outstanding debt is subtracted from net worth.
         </p>
       ) : null}
       <div className="money-networth-toggle">

@@ -1,8 +1,9 @@
 'use client';
 
-import { useRef, useState, useTransition } from 'react';
+import { useRef, useState } from 'react';
 import type { Area } from '@/lib/areas';
 import type { Task } from '@/lib/tasks';
+import { openIntenseModeForTask } from '@/components/intense-mode';
 import { SwipeTask } from '@/components/swipe-task';
 import {
   EFFORTS,
@@ -12,7 +13,7 @@ import {
   quadrantFor,
   unplace,
 } from '@/lib/task-scales';
-import { completeTask, moveTomorrow, removeTask } from './actions';
+import { completeTask, removeTask } from './actions';
 import { TaskForm } from './task-form';
 
 /**
@@ -339,7 +340,6 @@ function scalePoint(importance: number, effortMinutes: number) {
 }
 
 function TaskDot({ task, onEdit }: { task: Task; onEdit: () => void }) {
-  const [pending, start] = useTransition();
   const hold = useRef<ReturnType<typeof setTimeout> | null>(null);
   const held = useRef(false);
 
@@ -353,14 +353,19 @@ function TaskDot({ task, onEdit }: { task: Task; onEdit: () => void }) {
         height: task.size,
         background: task.areaColour ?? '#8A8A90',
       }}
-      aria-label={`${task.title}. Tap to complete or press and hold to edit.`}
-      disabled={pending}
-      onPointerDown={() => {
+      aria-label={`${task.title}. Tap to edit or press and hold for Intense Mode.`}
+      onPointerDown={(event) => {
         held.current = false;
+        const item = event.currentTarget.getBoundingClientRect();
+        const phone = event.currentTarget.closest('.phone')?.getBoundingClientRect();
+        const origin = {
+          x: item.left + item.width / 2 - (phone?.left ?? 0),
+          y: item.top + item.height / 2 - (phone?.top ?? 0),
+        };
         hold.current = setTimeout(() => {
           held.current = true;
           navigator.vibrate?.(30);
-          onEdit();
+          openIntenseModeForTask(task.id, origin);
         }, 550);
       }}
       onPointerUp={() => hold.current && clearTimeout(hold.current)}
@@ -370,7 +375,7 @@ function TaskDot({ task, onEdit }: { task: Task; onEdit: () => void }) {
           held.current = false;
           return;
         }
-        start(() => void completeTask(task.id));
+        onEdit();
       }}
     />
   );
@@ -380,9 +385,9 @@ function TaskRow({ task, onEdit }: { task: Task; onEdit: () => void }) {
   return (
     <SwipeTask
       label={task.title}
-      onTap={() => completeTask(task.id)}
-      onHold={onEdit}
-      onTomorrow={() => moveTomorrow(task.id)}
+      onTap={onEdit}
+      onHold={(origin) => openIntenseModeForTask(task.id, origin)}
+      onComplete={() => completeTask(task.id)}
       onDelete={() => removeTask(task.id)}
     >
       <div className="task task--gesture">

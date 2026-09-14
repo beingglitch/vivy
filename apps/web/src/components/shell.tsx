@@ -16,6 +16,7 @@ import {
   SendIcon,
   TodayIcon,
 } from './icons';
+import { INTENSE_MODE_EVENT, IntenseMode, type IntenseOrigin } from './intense-mode';
 
 interface VoiceResultEvent {
   results: ArrayLike<{ 0?: { transcript?: string } }>;
@@ -59,34 +60,115 @@ const TABS = [
 
 export function TabBar() {
   const pathname = usePathname();
+  const [intenseOpen, setIntenseOpen] = useState(false);
+  const [intenseOrigin, setIntenseOrigin] = useState({ x: 96, y: 720 });
+  const [intenseTaskId, setIntenseTaskId] = useState<string | null>(null);
+  const intensePress = useRef<{
+    timer: ReturnType<typeof setTimeout>;
+    x: number;
+    y: number;
+  } | null>(null);
+  const suppressTodayClick = useRef(false);
+
+  function cancelIntensePress() {
+    if (!intensePress.current) return;
+    clearTimeout(intensePress.current.timer);
+    intensePress.current = null;
+  }
+
+  useEffect(() => cancelIntensePress, []);
+
+  useEffect(() => {
+    const openForTask = (event: Event) => {
+      const detail = (event as CustomEvent<{ taskId: string; origin: IntenseOrigin }>).detail;
+      setIntenseTaskId(detail.taskId);
+      setIntenseOrigin(detail.origin);
+      setIntenseOpen(true);
+    };
+    window.addEventListener(INTENSE_MODE_EVENT, openForTask);
+    return () => window.removeEventListener(INTENSE_MODE_EVENT, openForTask);
+  }, []);
 
   return (
-    <nav className="tabbar" aria-label="Sections">
-      {TABS.map(({ href, label, Icon }) => {
-        // `/` must match exactly, or it would light up on every route.
-        const active =
-          href === '/'
-            ? pathname === '/'
-            : href === '/more'
-              ? pathname === '/more' ||
-                pathname.startsWith('/more/sources') ||
-                pathname.startsWith('/more/settings')
-              : pathname.startsWith(href);
-        return (
-          <Link
-            key={href}
-            href={href as Route}
-            className="tab"
-            aria-current={active ? 'page' : undefined}
-          >
-            <span className="tab__icon">
-              <Icon />
-            </span>
-            <span>{label}</span>
-          </Link>
-        );
-      })}
-    </nav>
+    <>
+      <nav className="tabbar" aria-label="Sections">
+        {TABS.map(({ href, label, Icon }) => {
+          // `/` must match exactly, or it would light up on every route.
+          const active =
+            href === '/'
+              ? pathname === '/'
+              : href === '/more'
+                ? pathname === '/more' ||
+                  (pathname.startsWith('/more/') && !pathname.startsWith('/more/areas'))
+                : pathname.startsWith(href);
+          const isToday = href === '/today';
+          return (
+            <Link
+              key={href}
+              href={href as Route}
+              className="tab"
+              aria-current={active ? 'page' : undefined}
+              onPointerDown={(event) => {
+                if (!isToday) return;
+                if (event.pointerType === 'mouse' && event.button !== 0) return;
+                const item = event.currentTarget.getBoundingClientRect();
+                const phone = event.currentTarget.closest('.phone')?.getBoundingClientRect();
+                const origin = {
+                  x: item.left + item.width / 2 - (phone?.left ?? 0),
+                  y: item.top + item.height / 2 - (phone?.top ?? 0),
+                };
+                suppressTodayClick.current = false;
+                intensePress.current = {
+                  x: event.clientX,
+                  y: event.clientY,
+                  timer: setTimeout(() => {
+                    intensePress.current = null;
+                    suppressTodayClick.current = true;
+                    navigator.vibrate?.(35);
+                    setIntenseTaskId(null);
+                    setIntenseOrigin(origin);
+                    setIntenseOpen(true);
+                  }, 600),
+                };
+              }}
+              onPointerMove={(event) => {
+                if (!isToday || !intensePress.current) return;
+                const distance = Math.hypot(
+                  event.clientX - intensePress.current.x,
+                  event.clientY - intensePress.current.y,
+                );
+                if (distance > 10) cancelIntensePress();
+              }}
+              onPointerUp={() => {
+                if (isToday) cancelIntensePress();
+              }}
+              onPointerCancel={() => {
+                if (isToday) cancelIntensePress();
+              }}
+              onContextMenu={(event) => {
+                if (isToday) event.preventDefault();
+              }}
+              onClick={(event) => {
+                if (!isToday || !suppressTodayClick.current) return;
+                event.preventDefault();
+                suppressTodayClick.current = false;
+              }}
+            >
+              <span className="tab__icon">
+                <Icon />
+              </span>
+              <span>{label}</span>
+            </Link>
+          );
+        })}
+      </nav>
+      <IntenseMode
+        open={intenseOpen}
+        origin={intenseOrigin}
+        initialTaskId={intenseTaskId}
+        onClose={() => setIntenseOpen(false)}
+      />
+    </>
   );
 }
 

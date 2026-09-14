@@ -6,6 +6,9 @@ import { Dock } from '@/components/shell';
 export const dynamic = 'force-dynamic';
 
 const MAIN_ITEMS = [
+  { href: null, label: 'Habit / Recurring', note: 'coming soon' },
+  { href: null, label: 'Health', note: 'coming soon' },
+  { href: '/more/intense', label: 'Intense Mode', note: 'focus timer' },
   { href: null, label: 'Activity', note: 'coming soon' },
 ] as const;
 

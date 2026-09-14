@@ -607,3 +607,47 @@ export const tasks = pgTable(
     index('tasks_area_idx').on(t.userId, t.areaId),
   ],
 );
+
+/** Account-wide defaults for the timer opened by long-pressing Today. */
+export const intenseSettings = pgTable('intense_settings', {
+  userId: uuid('user_id').primaryKey(),
+  sessionType: text('session_type').notNull().default('pomodoro'),
+  focusMinutes: integer('focus_minutes').notNull().default(25),
+  shortBreakMinutes: integer('short_break_minutes').notNull().default(5),
+  longBreakMinutes: integer('long_break_minutes').notNull().default(20),
+  roundsBeforeLongBreak: integer('rounds_before_long_break').notNull().default(4),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
+ * One Intense Mode cycle.
+ *
+ * The deadline is persisted rather than a decrementing counter, so leaving the
+ * screen, suspending the PWA, or opening another device does not reset time.
+ */
+export const intenseSessions = pgTable(
+  'intense_sessions',
+  {
+    id: uuid('id').primaryKey(),
+    userId: uuid('user_id').notNull(),
+    taskId: uuid('task_id').notNull(),
+    sessionType: text('session_type').notNull(),
+    phase: text('phase').notNull().default('focus'),
+    focusMinutes: integer('focus_minutes').notNull(),
+    shortBreakMinutes: integer('short_break_minutes').notNull(),
+    longBreakMinutes: integer('long_break_minutes').notNull(),
+    roundsBeforeLongBreak: integer('rounds_before_long_break').notNull(),
+    round: integer('round').notNull().default(1),
+    status: text('status').notNull().default('active'),
+    phaseStartedAt: timestamp('phase_started_at', { withTimezone: true }).notNull(),
+    phaseEndsAt: timestamp('phase_ends_at', { withTimezone: true }).notNull(),
+    remainingSeconds: integer('remaining_seconds'),
+    startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('intense_sessions_user_status_idx').on(t.userId, t.status),
+    index('intense_sessions_task_idx').on(t.userId, t.taskId),
+  ],
+);

@@ -6,14 +6,9 @@ import type { Area } from '@/lib/areas';
 import type { Task } from '@/lib/tasks';
 import { Empty } from '@/components/empty';
 import { CheckIcon } from '@/components/icons';
-import {
-  addTask,
-  completeTask,
-  moveTomorrow,
-  removeTask,
-  reopenTask,
-} from '@/app/(app)/quadrant/actions';
+import { addTask, completeTask, removeTask, reopenTask } from '@/app/(app)/quadrant/actions';
 import { TaskForm } from '@/app/(app)/quadrant/task-form';
+import { openIntenseModeForTask } from '@/components/intense-mode';
 import { Composer, TabBar } from '@/components/shell';
 import { SwipeTask } from '@/components/swipe-task';
 
@@ -115,9 +110,10 @@ function Row({ task, done, onEdit }: { task: Task; done: boolean; onEdit: () => 
   return (
     <SwipeTask
       label={task.title}
-      onTap={() => (done ? reopenTask(task.id) : completeTask(task.id))}
-      onHold={onEdit}
-      onTomorrow={() => moveTomorrow(task.id)}
+      onTap={onEdit}
+      onHold={(origin) => openIntenseModeForTask(task.id, origin)}
+      onComplete={() => (done ? reopenTask(task.id) : completeTask(task.id))}
+      completeLabel={done ? 'Reopen' : 'Complete'}
       onDelete={() => removeTask(task.id)}
     >
       <div className="task task--gesture">

@@ -10,14 +10,16 @@ export function SwipeTask({
   children,
   onTap,
   onHold,
-  onTomorrow,
+  onComplete,
+  completeLabel = 'Complete',
   onDelete,
 }: {
   label: string;
   children: ReactNode;
-  onTap: () => Promise<unknown>;
-  onHold: () => void;
-  onTomorrow: () => Promise<unknown>;
+  onTap: () => void;
+  onHold: (origin: { x: number; y: number }) => void;
+  onComplete: () => Promise<unknown>;
+  completeLabel?: string;
   onDelete: () => Promise<unknown>;
 }) {
   const [offset, setOffset] = useState(0);
@@ -29,6 +31,7 @@ export function SwipeTask({
     currentOffset: number;
     moved: boolean;
     held: boolean;
+    origin: { x: number; y: number };
     timer: ReturnType<typeof setTimeout>;
   } | null>(null);
 
@@ -49,11 +52,11 @@ export function SwipeTask({
       <div className="swipe-task__actions" aria-hidden={offset === 0}>
         <button
           type="button"
-          className="swipe-task__tomorrow"
+          className="swipe-task__complete"
           tabIndex={offset > 0 ? 0 : -1}
-          onClick={() => run(onTomorrow)}
+          onClick={() => run(onComplete)}
         >
-          Tomorrow
+          {completeLabel}
         </button>
         <button
           type="button"
@@ -69,24 +72,30 @@ export function SwipeTask({
         style={{ transform: `translateX(${offset}px)` }}
         role="button"
         tabIndex={0}
-        aria-label={`${label}. Tap to complete, swipe right for tomorrow, swipe left to delete, or press and hold to edit.`}
+        aria-label={`${label}. Tap to edit, swipe right to ${completeLabel.toLowerCase()}, swipe left to delete, or press and hold for Intense Mode.`}
         aria-busy={pending}
         onPointerDown={(event) => {
           event.stopPropagation();
           if (pending) return;
           setDragging(true);
           event.currentTarget.setPointerCapture(event.pointerId);
+          const item = event.currentTarget.getBoundingClientRect();
+          const phone = event.currentTarget.closest('.phone')?.getBoundingClientRect();
           gesture.current = {
             x: event.clientX,
             offset,
             currentOffset: offset,
             moved: false,
             held: false,
+            origin: {
+              x: item.left + item.width / 2 - (phone?.left ?? 0),
+              y: item.top + item.height / 2 - (phone?.top ?? 0),
+            },
             timer: setTimeout(() => {
               if (!gesture.current || gesture.current.moved) return;
               gesture.current.held = true;
               navigator.vibrate?.(30);
-              onHold();
+              onHold(gesture.current.origin);
             }, 550),
           };
         }}
@@ -118,7 +127,7 @@ export function SwipeTask({
             return;
           }
           if (offset !== 0) setOffset(0);
-          else run(onTap);
+          else onTap();
         }}
         onPointerCancel={() => {
           cancelGesture();
@@ -128,7 +137,7 @@ export function SwipeTask({
         onKeyDown={(event) => {
           if (event.key !== 'Enter' && event.key !== ' ') return;
           event.preventDefault();
-          run(onTap);
+          onTap();
         }}
       >
         {children}
