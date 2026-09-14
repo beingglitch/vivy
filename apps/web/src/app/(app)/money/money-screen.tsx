@@ -16,6 +16,7 @@ import {
   confirmAllTransactions,
   editMoneyAccount,
   reviewTransaction,
+  setAccountNetWorth,
 } from './actions';
 
 type Sheet = 'add-menu' | 'account' | 'account-detail' | 'transaction' | 'review' | null;
@@ -391,16 +392,38 @@ function AccountDetail({
   onEdit: () => void;
 }) {
   const [range, setRange] = useState<Range>('6m');
+  const [shownInNetWorth, setShownInNetWorth] = useState(account.includeInNetworth);
+  const [visibilityPending, startVisibility] = useTransition();
   const points = pointsForRange(account.points, range);
   const values = points.map((point) => point.balanceMinor);
   const first = values[0] ?? account.balanceMinor;
   const change = account.balanceMinor - first;
+  const creditLimit = account.creditLimitMinor ?? 0;
+  const utilisation =
+    creditLimit > 0 ? Math.min(100, Math.round((account.balanceMinor / creditLimit) * 100)) : 0;
+
+  useEffect(() => setShownInNetWorth(account.includeInNetworth), [account.includeInNetworth]);
+
+  function toggleNetWorth() {
+    const next = !shownInNetWorth;
+    setShownInNetWorth(next);
+    startVisibility(async () => {
+      const result = await setAccountNetWorth(account.id, next);
+      if (!result.ok) setShownInNetWorth(!next);
+    });
+  }
 
   return (
     <MoneySheet title={account.name} onClose={onClose}>
       <div className="money-account-detail__head">
         <div>
-          <span>{account.isLiability ? 'Amount owed' : 'Balance'}</span>
+          <span>
+            {account.kind === 'credit-card'
+              ? 'Spent / outstanding'
+              : account.isLiability
+                ? 'Amount owed'
+                : 'Balance'}
+          </span>
           <strong>{formatInr(account.balanceMinor)}</strong>
           <small className={change > 0 && account.isLiability ? 'money-negative' : ''}>
             {change > 0 ? '+' : ''}
@@ -409,6 +432,35 @@ function AccountDetail({
         </div>
         <button type="button" className="money-link" onClick={onEdit}>
           Edit
+        </button>
+      </div>
+      {account.kind === 'credit-card' && creditLimit > 0 ? (
+        <div className="money-credit-limit">
+          <div>
+            <span>Available {formatInr(Math.max(0, creditLimit - account.balanceMinor))}</span>
+            <span>{utilisation}% used</span>
+          </div>
+          <div className="money-credit-limit__track">
+            <span style={{ width: `${utilisation}%` }} />
+          </div>
+          <small>Maximum limit {formatInr(creditLimit)}</small>
+        </div>
+      ) : null}
+      <div className="money-networth-toggle">
+        <div>
+          <strong>Show in net worth</strong>
+          <span>{shownInNetWorth ? 'Included in totals and pipelines' : 'Hidden from totals'}</span>
+        </div>
+        <button
+          type="button"
+          className={`area-switch${shownInNetWorth ? ' area-switch--on' : ''}`}
+          disabled={visibilityPending}
+          role="switch"
+          aria-checked={shownInNetWorth}
+          aria-label={`${shownInNetWorth ? 'Hide' : 'Show'} ${account.name} in net worth`}
+          onClick={toggleNetWorth}
+        >
+          <span />
         </button>
       </div>
       <MoneyLineChart
@@ -527,6 +579,9 @@ function AccountSheet({
   const [kind, setKind] = useState(account?.kind ?? 'savings');
   const [ref, setRef] = useState(account?.ref ?? '');
   const [balance, setBalance] = useState(account ? String(account.balanceMinor / 100) : '');
+  const [creditLimit, setCreditLimit] = useState(
+    account?.creditLimitMinor ? String(account.creditLimitMinor / 100) : '',
+  );
   const [asOf, setAsOf] = useState(today());
   const [include, setInclude] = useState(account?.includeInNetworth ?? true);
   const [error, setError] = useState<string | null>(null);
@@ -535,6 +590,10 @@ function AccountSheet({
   function save() {
     const balanceMinor = amountToMinor(balance);
     if (balanceMinor === null) return setError('Enter a valid balance.');
+    const creditLimitMinor = kind === 'credit-card' ? amountToMinor(creditLimit) : null;
+    if (kind === 'credit-card' && !creditLimitMinor) {
+      return setError('Enter the card maximum limit.');
+    }
     start(async () => {
       const result = account
         ? await editMoneyAccount(account.id, {
@@ -542,6 +601,7 @@ function AccountSheet({
             kind,
             ref,
             balanceMinor,
+            creditLimitMinor,
             asOf,
             includeInNetworth: include,
           })
@@ -550,6 +610,7 @@ function AccountSheet({
             kind,
             ref,
             balanceMinor,
+            creditLimitMinor,
             asOf,
             includeInNetworth: include,
           });
@@ -580,7 +641,13 @@ function AccountSheet({
       </label>
       <div className="money-field-row">
         <label className="money-field">
-          <span>{kind === 'personal-debt' ? 'Amount still owed' : 'Balance'}</span>
+          <span>
+            {kind === 'personal-debt'
+              ? 'Amount still owed'
+              : kind === 'credit-card'
+                ? 'Spent / outstanding'
+                : 'Balance'}
+          </span>
           <input
             value={balance}
             inputMode="decimal"
@@ -588,24 +655,55 @@ function AccountSheet({
             onChange={(event) => setBalance(event.target.value)}
           />
         </label>
+        {kind === 'credit-card' ? (
+          <label className="money-field">
+            <span>Maximum limit</span>
+            <input
+              value={creditLimit}
+              inputMode="decimal"
+              placeholder="0.00"
+              onChange={(event) => setCreditLimit(event.target.value)}
+            />
+          </label>
+        ) : (
+          <label className="money-field">
+            <span>As of</span>
+            <input type="date" value={asOf} onChange={(event) => setAsOf(event.target.value)} />
+          </label>
+        )}
+      </div>
+      {kind === 'credit-card' ? (
         <label className="money-field">
-          <span>As of</span>
+          <span>Outstanding as of</span>
           <input type="date" value={asOf} onChange={(event) => setAsOf(event.target.value)} />
         </label>
-      </div>
+      ) : null}
       {kind === 'personal-debt' ? (
         <p className="money-field-hint">
           Use the person&apos;s name as the account name. This amount is treated as a liability.
         </p>
       ) : null}
-      <label className="money-check-row">
-        <input
-          type="checkbox"
-          checked={include}
-          onChange={(event) => setInclude(event.target.checked)}
-        />
-        Include in net worth
-      </label>
+      {kind === 'credit-card' ? (
+        <p className="money-field-hint">
+          Card spending increases outstanding debt. Payments reduce it; only outstanding debt is
+          subtracted from net worth.
+        </p>
+      ) : null}
+      <div className="money-networth-toggle">
+        <div>
+          <strong>Show in net worth</strong>
+          <span>{include ? 'Included in totals and pipelines' : 'Hidden from totals'}</span>
+        </div>
+        <button
+          type="button"
+          className={`area-switch${include ? ' area-switch--on' : ''}`}
+          role="switch"
+          aria-checked={include}
+          onClick={() => setInclude((current) => !current)}
+        >
+          <span />
+        </button>
+      </div>
       {error ? <p className="pair__error">{error}</p> : null}
       <button
         type="button"

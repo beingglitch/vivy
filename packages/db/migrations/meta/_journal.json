@@ -71,6 +71,20 @@
       "when": 1789359953955,
       "tag": "0009_public_prism",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1789364197133,
+      "tag": "0010_spicy_nico_minoru",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1789364734970,
+      "tag": "0011_panoramic_thena",
+      "breakpoints": true
     }
   ]
 }

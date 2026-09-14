@@ -1,9 +1,13 @@
 import Link from 'next/link';
+import { headers } from 'next/headers';
 import { ChevronIcon } from '@/components/icons';
 import { Dock } from '@/components/shell';
 import { PushToggle } from '@/components/push-toggle';
 import { loadSteps, type StepState } from '@/lib/onboarding';
 import { requirePageUserId } from '@/lib/page-session';
+import { lookupAndroidRelease } from '@/lib/releases';
+import { listDevices } from '@/lib/devices';
+import { AndroidApp } from '../settings/android-app';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,8 +22,16 @@ export const dynamic = 'force-dynamic';
  * not "incomplete".
  */
 export default async function SourcesPage() {
-  const steps = await loadSteps(await requirePageUserId());
+  const userId = await requirePageUserId();
+  const [steps, lookup, phones, head] = await Promise.all([
+    loadSteps(userId),
+    lookupAndroidRelease(),
+    listDevices(userId, 'android'),
+    headers(),
+  ]);
   const connected = steps.filter((s) => s.status === 'done').length;
+  const host = head.get('host') ?? 'localhost:3000';
+  const proto = head.get('x-forwarded-proto') ?? (host.startsWith('localhost') ? 'http' : 'https');
 
   return (
     <>
@@ -46,6 +58,13 @@ export default async function SourcesPage() {
             <span className="src__summary">{step.source.summary}</span>
           </Link>
         ))}
+
+        <AndroidApp
+          release={lookup.ok ? lookup.release : null}
+          origin={`${proto}://${host}`}
+          phones={phones}
+          problem={lookup.ok ? undefined : lookup.problem}
+        />
 
         <section className="src__section">
           <span className="eyebrow">Reminders</span>

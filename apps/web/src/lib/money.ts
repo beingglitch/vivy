@@ -54,6 +54,7 @@ export async function getMoneyDashboard(userId: string): Promise<MoneyDashboard>
     ref: account.ref,
     currency: account.currency,
     isLiability: account.isLiability,
+    creditLimitMinor: account.creditLimitMinor,
     includeInNetworth: account.includeInNetworth,
     source: account.source,
     balanceMinor: balances.get(account.id) ?? 0,
@@ -121,6 +122,7 @@ export async function createMoneyAccount(
     kind: string;
     ref?: string | null;
     balanceMinor: number;
+    creditLimitMinor?: number | null;
     asOf: string;
     includeInNetworth: boolean;
   },
@@ -131,6 +133,7 @@ export async function createMoneyAccount(
     throw new Error('Choose an account type.');
   }
   validateMoney(input.balanceMinor);
+  const creditLimitMinor = validateCreditLimit(input.kind, input.creditLimitMinor);
   validateDate(input.asOf);
 
   const id = randomUUID();
@@ -144,6 +147,7 @@ export async function createMoneyAccount(
       ref: cleanRef(input.ref),
       currency: 'INR',
       isLiability,
+      creditLimitMinor,
       includeInNetworth: input.includeInNetworth,
       source: 'manual',
     });
@@ -166,6 +170,7 @@ export async function updateMoneyAccount(
     kind: string;
     ref?: string | null;
     balanceMinor?: number;
+    creditLimitMinor?: number | null;
     asOf?: string;
     includeInNetworth: boolean;
   },
@@ -182,6 +187,7 @@ export async function updateMoneyAccount(
     throw new Error('Choose an account type.');
   }
   const isLiability = liabilityKind(input.kind);
+  const creditLimitMinor = validateCreditLimit(input.kind, input.creditLimitMinor);
 
   await db().transaction(async (transaction) => {
     await transaction
@@ -191,6 +197,7 @@ export async function updateMoneyAccount(
         kind: input.kind,
         ref: cleanRef(input.ref),
         isLiability,
+        creditLimitMinor,
         includeInNetworth: input.includeInNetworth,
         updatedAt: new Date(),
       })
@@ -219,6 +226,19 @@ export async function updateMoneyAccount(
         });
     }
   });
+}
+
+export async function setMoneyAccountNetWorthVisibility(
+  userId: string,
+  accountId: string,
+  includeInNetworth: boolean,
+): Promise<void> {
+  const changed = await db()
+    .update(accounts)
+    .set({ includeInNetworth, updatedAt: new Date() })
+    .where(and(eq(accounts.id, accountId), eq(accounts.userId, userId)))
+    .returning({ id: accounts.id });
+  if (changed.length === 0) throw new Error('Account not found.');
 }
 
 export async function createManualTransaction(
@@ -437,6 +457,13 @@ function validateMoney(value: number, allowZero = true): void {
 
 function liabilityKind(kind: string): boolean {
   return kind === 'credit-card' || kind === 'loan' || kind === 'personal-debt';
+}
+
+function validateCreditLimit(kind: string, value?: number | null): number | null {
+  if (kind !== 'credit-card') return null;
+  if (value === null || value === undefined) throw new Error('Enter the card maximum limit.');
+  validateMoney(value, false);
+  return value;
 }
 
 async function requireAccount(userId: string, accountId: string): Promise<void> {

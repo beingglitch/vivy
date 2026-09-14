@@ -31,6 +31,7 @@ export interface MoneyAccount {
   ref: string | null;
   currency: string;
   isLiability: boolean;
+  creditLimitMinor: number | null;
   includeInNetworth: boolean;
   source: string;
   balanceMinor: number;

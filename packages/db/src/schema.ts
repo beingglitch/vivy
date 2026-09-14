@@ -47,6 +47,8 @@ export const users = pgTable(
   {
     id: uuid('id').primaryKey(),
     email: text('email').notNull(),
+    displayName: text('display_name'),
+    accentColour: text('accent_colour').notNull().default('#4F46E5'),
     /**
      * Null only between provisioning and the set-passphrase step.
      *
@@ -319,6 +321,7 @@ export const accounts = pgTable(
     ref: text('ref'),
     currency: text('currency').notNull().default('INR'),
     isLiability: boolean('is_liability').notNull().default(false),
+    creditLimitMinor: integer('credit_limit_minor'),
     includeInNetworth: boolean('include_in_networth').notNull().default(true),
     source: text('source').notNull().default('sms'), // sms | manual | statement | api
     archivedAt: timestamp('archived_at', { withTimezone: true }),

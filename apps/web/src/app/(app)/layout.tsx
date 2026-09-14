@@ -1,10 +1,11 @@
 import { redirect } from 'next/navigation';
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { ReminderBanner } from '@/components/reminder-banner';
 import { dueReminders } from '@/lib/onboarding';
 import { currentUserId, hasPassphrase } from '@/lib/session';
 import { currentAdmin } from '@/lib/admin';
 import { accessFor } from '@/lib/access';
+import { profileOf } from '@/lib/profile';
 
 /**
  * Every designed screen shares this frame.
@@ -33,11 +34,16 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   // passphrase has not finished setting up, so neither should see this screen.
   if (!(await accessFor(userId)).allowed) redirect('/access-ended');
 
-  const due = await dueReminders(userId);
+  const [due, profile] = await Promise.all([dueReminders(userId), profileOf(userId)]);
+  const accentStyle = {
+    '--accent': profile.accentColour,
+    '--accent-soft': `color-mix(in srgb, ${profile.accentColour} 12%, white)`,
+    '--accent-wash': `color-mix(in srgb, ${profile.accentColour} 5%, white)`,
+  } as CSSProperties;
 
   return (
     <div className="board">
-      <div className="phone">
+      <div className="phone" style={accentStyle}>
         {due.length > 0 ? (
           <ReminderBanner name={due[0]!.source.name} sourceId={due[0]!.source.id} />
         ) : null}

@@ -5,11 +5,15 @@ import { Dock } from '@/components/shell';
 
 export const dynamic = 'force-dynamic';
 
-const PERSONAL_ITEMS = [{ href: null, label: 'Activity', note: 'coming soon' }] as const;
+const PERSONAL_ITEMS = [
+  { href: '/more/user', label: 'User', note: 'name and profile' },
+  { href: '/more/preferences', label: 'Preferences', note: 'appearance and accent' },
+  { href: null, label: 'Activity', note: 'coming soon' },
+] as const;
 
 const SYSTEM_ITEMS = [
   { href: '/more/sources', label: 'Sources', note: 'connect your devices' },
-  { href: '/more/settings', label: 'Settings', note: 'sign-in and account' },
+  { href: '/more/settings', label: 'Security', note: 'passphrase and sign-in' },
 ] as const;
 
 export default function MorePage() {

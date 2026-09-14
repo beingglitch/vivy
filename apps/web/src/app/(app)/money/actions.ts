@@ -6,6 +6,7 @@ import {
   createManualTransaction,
   createMoneyAccount,
   reviewMoneyTransaction,
+  setMoneyAccountNetWorthVisibility,
   updateMoneyAccount,
 } from '@/lib/money';
 import { requireUserId } from '@/lib/session';
@@ -32,6 +33,7 @@ export async function addMoneyAccount(input: {
   kind: string;
   ref?: string | null;
   balanceMinor: number;
+  creditLimitMinor?: number | null;
   asOf: string;
   includeInNetworth: boolean;
 }): Promise<MoneyResult> {
@@ -45,11 +47,21 @@ export async function editMoneyAccount(
     kind: string;
     ref?: string | null;
     balanceMinor?: number;
+    creditLimitMinor?: number | null;
     asOf?: string;
     includeInNetworth: boolean;
   },
 ): Promise<MoneyResult> {
   return resultFor((userId) => updateMoneyAccount(userId, accountId, input));
+}
+
+export async function setAccountNetWorth(
+  accountId: string,
+  includeInNetworth: boolean,
+): Promise<MoneyResult> {
+  return resultFor((userId) =>
+    setMoneyAccountNetWorthVisibility(userId, accountId, includeInNetworth),
+  );
 }
 
 export async function addManualMoneyTransaction(input: {

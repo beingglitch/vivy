@@ -1068,6 +1068,58 @@ a {
   color: var(--green);
   font-size: 11px;
 }
+.money-credit-limit {
+  padding: 12px 13px;
+  border: 1px solid var(--line-3);
+  border-radius: 14px;
+  background: var(--surface-1);
+}
+.money-credit-limit > div:first-child {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.money-credit-limit__track {
+  height: 7px;
+  margin-top: 9px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: var(--line-3);
+}
+.money-credit-limit__track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+}
+.money-credit-limit small {
+  display: block;
+  margin-top: 7px;
+  color: var(--grey-3);
+  font-size: 10px;
+}
+.money-networth-toggle {
+  min-height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+.money-networth-toggle > div {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.money-networth-toggle strong {
+  font-size: 13px;
+}
+.money-networth-toggle > div span {
+  color: var(--grey-3);
+  font-size: 10.5px;
+}
 .money-account-detail__dates,
 .money-account-detail__stats {
   display: flex;
@@ -3569,6 +3621,43 @@ a {
 }
 .area-switch:disabled {
   opacity: 0.5;
+}
+.accent-picker {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px 8px;
+}
+.accent-picker button {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  color: var(--grey-4);
+}
+.accent-picker button > span {
+  width: 38px;
+  height: 38px;
+  border: 4px solid var(--paper);
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px var(--line-4);
+}
+.accent-picker .accent-picker__option--on > span {
+  box-shadow: 0 0 0 2px var(--ink);
+}
+.accent-picker small {
+  overflow: hidden;
+  font-size: 9.5px;
+  text-overflow: ellipsis;
+}
+.user-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.user-form .btn {
+  min-height: 50px;
+  border-radius: 25px;
 }
 .manage-areas__paused-label {
   min-height: 48px;

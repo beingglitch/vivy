@@ -1,4 +1,3 @@
-import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { Dock } from '@/components/shell';
 import { currentUser, currentUserId, hasPassphrase, preferredLoginOf } from '@/lib/session';
@@ -6,9 +5,6 @@ import { isAdminEmail } from '@/lib/admin-emails';
 import { LoginMethodPicker } from './picker';
 import { signOut } from './actions';
 import { PassphrasePanel } from './passphrase-panel';
-import { lookupAndroidRelease } from '@/lib/releases';
-import { listDevices } from '@/lib/devices';
-import { AndroidApp } from './android-app';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,22 +16,12 @@ export default async function SettingsPage() {
   const preferred = await preferredLoginOf(userId);
   const hasOne = await hasPassphrase(userId);
   const admin = user ? isAdminEmail(user.email) : false;
-  const lookup = await lookupAndroidRelease();
-  const release = lookup.ok ? lookup.release : null;
-  const phones = await listDevices(userId, 'android');
-
-  // The address the browser actually used, so the QR points somewhere reachable
-  // rather than at a hardcoded guess.
-  const head = await headers();
-  const host = head.get('host') ?? 'localhost:3000';
-  const proto = head.get('x-forwarded-proto') ?? (host.startsWith('localhost') ? 'http' : 'https');
-
   return (
     <>
       <div className="header">
         <div className="header__row">
           <div className="header__titles">
-            <h1 className="title">Settings</h1>
+            <h1 className="title">Security</h1>
             <span className="subtitle">
               {user?.email}
               {admin ? ' · admin' : ''}
@@ -75,13 +61,6 @@ export default async function SettingsPage() {
             web. Their derived transactions and totals remain available after either sign-in.
           </p>
         </section>
-
-        <AndroidApp
-          release={release}
-          origin={`${proto}://${host}`}
-          phones={phones}
-          problem={lookup.ok ? undefined : lookup.problem}
-        />
 
         <section className="src__section">
           <span className="eyebrow">Session</span>
