@@ -15,6 +15,18 @@ export const IMPORTANCE = [
 export const MIN_EFFORT_MINUTES = 5;
 export const MAX_EFFORT_MINUTES = 24 * 60;
 
+export type Quadrant = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+
+/** Return the visible grid quadrant for a task's two scale values. */
+export function quadrantFor(importance: number, effortMinutes: number): Quadrant {
+  const isTop = importance >= 3;
+  // The grid's centre is logarithmic, matching its X-axis placement.
+  const isLeft = effortMinutes <= Math.sqrt(MIN_EFFORT_MINUTES * MAX_EFFORT_MINUTES);
+
+  if (isTop) return isLeft ? 'top-left' : 'top-right';
+  return isLeft ? 'bottom-left' : 'bottom-right';
+}
+
 export const EFFORTS = [
   { value: MIN_EFFORT_MINUTES, label: '5 min' },
   { value: 15, label: '15 min' },
@@ -43,7 +55,7 @@ export const DEADLINE_KINDS = [
   {
     value: 'persists',
     label: 'Still needed',
-    hint: 'The date passing changes nothing. A late assignment is still an assignment.',
+    hint: '',
   },
 ] as const;
 

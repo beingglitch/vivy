@@ -43,6 +43,13 @@ export default async function TodayPage({
             <h1 className="title">Today</h1>
             <span className="subtitle">{today}</span>
           </div>
+          <div
+            className="today-progress"
+            aria-label={`${done.length} of ${open.length + done.length} done`}
+          >
+            <strong>{done.length}</strong>
+            <span>of {open.length + done.length} done</span>
+          </div>
         </div>
       </div>
 

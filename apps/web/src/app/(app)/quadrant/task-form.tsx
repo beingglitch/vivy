@@ -9,6 +9,7 @@ import {
   MAX_EFFORT_MINUTES,
   MIN_EFFORT_MINUTES,
   addPeriodTo,
+  quadrantFor,
   type DeadlineKind,
 } from '@/lib/task-scales';
 import { addTask, editTask } from './actions';
@@ -74,12 +75,14 @@ export function TaskForm({
   importance: initialImportance,
   effortMinutes: initialEffort,
   task,
+  onQuadrantChange,
   onDone,
 }: {
   areas: Area[];
   importance: number;
   effortMinutes: number;
   task?: Task;
+  onQuadrantChange?: (values: { importance: number; effortMinutes: number }) => void;
   onDone: () => void;
 }) {
   const [title, setTitle] = useState(task?.title ?? '');
@@ -113,6 +116,12 @@ export function TaskForm({
     x: number;
     y: number;
   } | null>(null);
+
+  function updateScales(nextImportance: number, nextEffort: number) {
+    setImportance(nextImportance);
+    setEffort(nextEffort);
+    onQuadrantChange?.({ importance: nextImportance, effortMinutes: nextEffort });
+  }
 
   useEffect(() => {
     const options = loadDeadlineOrder();
@@ -219,6 +228,31 @@ export function TaskForm({
         </>
       ) : null}
 
+      <div className="task-quadrants">
+        <span className="field__label">Quadrant</span>
+        <div className="task-quadrants__grid">
+          {[
+            { value: 'top-left', label: 'Important · quick', importance: 4, effort: 30 },
+            { value: 'top-right', label: 'Important · longer', importance: 4, effort: 240 },
+            { value: 'bottom-left', label: 'Less important · quick', importance: 1, effort: 30 },
+            { value: 'bottom-right', label: 'Less important · longer', importance: 1, effort: 240 },
+          ].map((option) => (
+            <button
+              type="button"
+              key={option.value}
+              className={`task-quadrants__option${
+                quadrantFor(importance, effort) === option.value
+                  ? ' task-quadrants__option--on'
+                  : ''
+              }`}
+              onClick={() => updateScales(option.importance, option.effort)}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="task-scale">
         <div className="task-scale__head">
           <span className="field__label">Y · Importance</span>
@@ -231,7 +265,7 @@ export function TaskForm({
           max={4}
           step={1}
           value={importance}
-          onChange={(event) => setImportance(Number(event.target.value))}
+          onChange={(event) => updateScales(Number(event.target.value), effort)}
           aria-label="Y importance"
         />
         <div className="task-scale__ends">
@@ -252,7 +286,9 @@ export function TaskForm({
           max={100}
           step={1}
           value={effortProgress(effort)}
-          onChange={(event) => setEffort(effortFromProgress(Number(event.target.value)))}
+          onChange={(event) =>
+            updateScales(importance, effortFromProgress(Number(event.target.value)))
+          }
           aria-label="X time to finish"
         />
         <div className="task-scale__ends">
@@ -280,10 +316,11 @@ export function TaskForm({
           </button>
         ))}
       </div>
-      <p className="formhint">{DEADLINE_KINDS.find((k) => k.value === kind)?.hint}</p>
-      <p className="formhint">
-        Press and hold a deadline type to move it first and make it default.
-      </p>
+      {DEADLINE_KINDS.find((deadline) => deadline.value === kind)?.hint ? (
+        <p className="formhint">
+          {DEADLINE_KINDS.find((deadline) => deadline.value === kind)?.hint}
+        </p>
+      ) : null}
 
       {kind !== 'none' ? (
         <>
@@ -347,20 +384,6 @@ export function TaskForm({
               value={date}
               onChange={(event) => setDate(event.target.value)}
             />
-          ) : null}
-
-          {due ? (
-            <p className="formhint">
-              Due{' '}
-              {due.toLocaleDateString('en-GB', {
-                weekday: 'short',
-                day: 'numeric',
-                month: 'short',
-              })}
-              {kind === 'expires'
-                ? '. After that it drops off the board.'
-                : '. After that it falls behind.'}
-            </p>
           ) : null}
         </>
       ) : null}

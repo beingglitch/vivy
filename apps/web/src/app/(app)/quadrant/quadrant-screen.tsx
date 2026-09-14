@@ -3,7 +3,7 @@
 import { useRef, useState, useTransition } from 'react';
 import type { Area } from '@/lib/areas';
 import type { Task } from '@/lib/tasks';
-import { EFFORTS, IMPORTANCE, unplace } from '@/lib/task-scales';
+import { EFFORTS, IMPORTANCE, quadrantFor, unplace } from '@/lib/task-scales';
 import { PlusIcon } from '@/components/icons';
 import { archiveTask, completeTask, removeTask } from './actions';
 import { TaskForm } from './task-form';
@@ -21,6 +21,10 @@ export function QuadrantScreen({ tasks, areas }: { tasks: Task[]; areas: Area[] 
   // instead, because that gesture says nothing about placement.
   const [draft, setDraft] = useState<{ importance: number; effortMinutes: number } | null>(null);
   const [editing, setEditing] = useState<Task | null>(null);
+  const [filtering, setFiltering] = useState(false);
+  const [areaFilter, setAreaFilter] = useState<string | null>(null);
+  const visibleTasks = areaFilter ? tasks.filter((task) => task.areaId === areaFilter) : tasks;
+  const selectedArea = areas.find((area) => area.id === areaFilter);
 
   /**
    * Tapping the grid says both numbers at once.
@@ -36,7 +40,13 @@ export function QuadrantScreen({ tasks, areas }: { tasks: Task[]; areas: Area[] 
     const box = event.currentTarget.getBoundingClientRect();
     const x = ((event.clientX - box.left) / box.width) * 100;
     const y = ((event.clientY - box.top) / box.height) * 100;
-    setDraft(unplace(x, y));
+    const nextDraft = unplace(x, y);
+    const tappedQuadrant = `${y < 50 ? 'top' : 'bottom'}-${x < 50 ? 'left' : 'right'}`;
+    if (draft && quadrantFor(draft.importance, draft.effortMinutes) === tappedQuadrant) {
+      setDraft(null);
+      return;
+    }
+    setDraft(nextDraft);
   }
 
   return (
@@ -51,20 +61,63 @@ export function QuadrantScreen({ tasks, areas }: { tasks: Task[]; areas: Area[] 
                 : `${tasks.length} open task${tasks.length === 1 ? '' : 's'}`}
             </span>
           </div>
-          <button
-            className="iconbtn"
-            aria-label={draft ? 'Cancel' : 'New task'}
-            onClick={() => {
-              // Middle of the board, since the button says nothing about where.
-              setDraft(draft ? null : { importance: 2, effortMinutes: 30 });
-            }}
-          >
-            <PlusIcon />
-          </button>
+          <div className="header__actions">
+            <button
+              type="button"
+              className="quadrant-filter"
+              aria-expanded={filtering}
+              onClick={() => setFiltering((current) => !current)}
+            >
+              <span
+                className="dot"
+                style={{ background: selectedArea?.colour ?? 'var(--accent)' }}
+              />
+              <span>{selectedArea?.name ?? 'All areas'}</span>
+            </button>
+            <button
+              className="iconbtn iconbtn--solid"
+              aria-label={draft ? 'Cancel' : 'New task'}
+              onClick={() => {
+                setDraft(draft ? null : { importance: 2, effortMinutes: 30 });
+              }}
+            >
+              <PlusIcon />
+            </button>
+          </div>
         </div>
       </div>
 
       <div className="screen screen--flush">
+        {filtering ? (
+          <div className="quadrant-area-filter chips">
+            <button
+              type="button"
+              className="chip"
+              aria-selected={areaFilter === null}
+              onClick={() => {
+                setAreaFilter(null);
+                setFiltering(false);
+              }}
+            >
+              All areas
+            </button>
+            {areas.map((area) => (
+              <button
+                type="button"
+                key={area.id}
+                className="chip"
+                aria-selected={areaFilter === area.id}
+                onClick={() => {
+                  setAreaFilter(area.id);
+                  setFiltering(false);
+                }}
+              >
+                <span className="dot" style={{ background: area.colour }} />
+                {area.name}
+              </button>
+            ))}
+          </div>
+        ) : null}
         <div style={{ padding: '0 20px', display: 'flex', gap: 8 }}>
           <div className="axis-y">
             <span>Important + due</span>
@@ -72,10 +125,23 @@ export function QuadrantScreen({ tasks, areas }: { tasks: Task[]; areas: Area[] 
           <div className="quadrant" onClick={tapGrid} role="presentation">
             {/* Top-left is tinted: important and quick, the place to look first. */}
             <div className="quadrant__hot" />
+            {draft ? (
+              <div
+                className={`quadrant__choice quadrant__choice--${quadrantFor(
+                  draft.importance,
+                  draft.effortMinutes,
+                )}`}
+                aria-hidden
+              />
+            ) : null}
             <div className="quadrant__vline" />
             <div className="quadrant__hline" />
+            <span className="quadrant__label quadrant__label--top-left">Do now</span>
+            <span className="quadrant__label quadrant__label--top-right">Schedule a block</span>
+            <span className="quadrant__label quadrant__label--bottom-left">Batch</span>
+            <span className="quadrant__label quadrant__label--bottom-right">Drop</span>
 
-            {tasks.map((task) => (
+            {visibleTasks.map((task) => (
               <TaskDot
                 key={task.id}
                 task={task}
@@ -105,6 +171,7 @@ export function QuadrantScreen({ tasks, areas }: { tasks: Task[]; areas: Area[] 
             areas={areas}
             importance={draft.importance}
             effortMinutes={draft.effortMinutes}
+            onQuadrantChange={setDraft}
             onDone={() => setDraft(null)}
           />
         ) : null}
@@ -119,20 +186,29 @@ export function QuadrantScreen({ tasks, areas }: { tasks: Task[]; areas: Area[] 
           />
         ) : null}
 
-        {tasks.length > 0 ? (
-          <ul className="qlist">
-            {tasks.map((task) => (
-              <li key={task.id}>
-                <TaskRow
-                  task={task}
-                  onEdit={() => {
-                    setDraft(null);
-                    setEditing(task);
-                  }}
-                />
-              </li>
-            ))}
-          </ul>
+        {visibleTasks.length > 0 ? (
+          <div className="quadrant-list">
+            <div className="quadrant-list__head">
+              <strong>{selectedArea?.name ?? 'Open tasks'}</strong>
+              <span>
+                {visibleTasks.length} task{visibleTasks.length === 1 ? '' : 's'} ·{' '}
+                {effortLabel(visibleTasks.reduce((total, task) => total + task.effortMinutes, 0))}
+              </span>
+            </div>
+            <ul className="qlist">
+              {visibleTasks.map((task) => (
+                <li key={task.id}>
+                  <TaskRow
+                    task={task}
+                    onEdit={() => {
+                      setDraft(null);
+                      setEditing(task);
+                    }}
+                  />
+                </li>
+              ))}
+            </ul>
+          </div>
         ) : null}
       </div>
     </>

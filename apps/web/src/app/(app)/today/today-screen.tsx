@@ -37,16 +37,24 @@ export function TodayScreen({
     next.setDate(next.getDate() + (distance < 0 ? 1 : -1));
     router.push(`/today?day=${next.toLocaleDateString('en-CA')}`);
   }
-  const groups = new Map<string, { name: string; colour: string; tasks: Task[] }>();
-  for (const task of open) {
-    const key = task.areaId ?? 'unfiled';
-    const group = groups.get(key) ?? {
-      name: task.areaName ?? 'Unfiled',
-      colour: task.areaColour ?? '#8A8A90',
-      tasks: [],
-    };
-    group.tasks.push(task);
-    groups.set(key, group);
+  const groups = new Map<
+    string,
+    { name: string; colour: string; tasks: { task: Task; done: boolean }[] }
+  >();
+  for (const [tasks, isDone] of [
+    [open, false],
+    [done, true],
+  ] as const) {
+    for (const task of tasks) {
+      const key = task.areaId ?? 'unfiled';
+      const group = groups.get(key) ?? {
+        name: task.areaName ?? 'Unfiled',
+        colour: task.areaColour ?? '#8A8A90',
+        tasks: [],
+      };
+      group.tasks.push({ task, done: isDone });
+      groups.set(key, group);
+    }
   }
 
   return (
@@ -70,22 +78,16 @@ export function TodayScreen({
         <section key={group.name} className="todaygroup">
           <span className="todaygroup__head">
             <span className="dot" style={{ background: group.colour }} />
-            {group.name}
+            <strong>{group.name}</strong>
+            <span className="todaygroup__count">
+              {group.tasks.filter((item) => item.done).length}/{group.tasks.length}
+            </span>
           </span>
-          {group.tasks.map((task) => (
-            <Row key={task.id} task={task} done={false} onEdit={() => setEditing(task)} />
+          {group.tasks.map(({ task, done: taskDone }) => (
+            <Row key={task.id} task={task} done={taskDone} onEdit={() => setEditing(task)} />
           ))}
         </section>
       ))}
-
-      {done.length > 0 ? (
-        <section className="todaygroup">
-          <span className="todaygroup__head">Done</span>
-          {done.map((task) => (
-            <Row key={task.id} task={task} done onEdit={() => setEditing(task)} />
-          ))}
-        </section>
-      ) : null}
       {editing ? (
         <TaskForm
           areas={areas}
