@@ -14,7 +14,7 @@ export const dynamic = 'force-dynamic';
  *
  * A queue, not a wizard: it offers the next undecided source and advances as
  * soon as one is decided, in any direction. There is no "back" because there is
- * nothing to undo, every state is editable afterwards from More > Sources.
+ * nothing to undo, every state is editable afterwards from More > Ingestors.
  *
  * Order runs most-valuable-first, so someone who bails after one screen still
  * has the highest-signal collector running.
@@ -130,8 +130,8 @@ function Finished({ decided, total }: { decided: number; total: number }) {
         <span className="ob__platform">Done</span>
         <h2 className="ob__title">That&apos;s everything</h2>
         <p className="ob__summary">
-          You decided on all {total} sources. Anything you skipped or scheduled is in More →
-          Sources, with the same instructions, whenever you want it.
+          You decided on all {total} ingestors. Anything you skipped or scheduled is in More →
+          Ingestors, with the same instructions, whenever you want it.
         </p>
         <div className="ob__actions">
           <Link className="btn btn--primary" href="/">
@@ -139,7 +139,7 @@ function Finished({ decided, total }: { decided: number; total: number }) {
           </Link>
           <div className="ob__minor">
             <Link className="btn btn--quiet" href="/more/sources">
-              Review sources ({decided})
+              Review ingestors ({decided})
             </Link>
           </div>
         </div>

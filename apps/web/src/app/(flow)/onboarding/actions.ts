@@ -48,7 +48,7 @@ export async function completeStep(sourceId: string): Promise<void> {
 }
 
 export async function skipStep(sourceId: string): Promise<void> {
-  // Skipped is not deleted: More > Sources still lists it with the same
+  // Skipped is not deleted: More > Ingestors still lists it with the same
   // instructions, so this is "stop asking", not "never again".
   await setStep(await requireUserId(), sourceId, 'skipped');
   revalidatePath('/onboarding');

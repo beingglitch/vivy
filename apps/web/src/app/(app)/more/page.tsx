@@ -5,15 +5,15 @@ import { Dock } from '@/components/shell';
 
 export const dynamic = 'force-dynamic';
 
-const PERSONAL_ITEMS = [
-  { href: '/more/user', label: 'User', note: 'name and profile' },
-  { href: '/more/preferences', label: 'Preferences', note: 'appearance and accent' },
+const MAIN_ITEMS = [
   { href: null, label: 'Activity', note: 'coming soon' },
 ] as const;
 
 const SYSTEM_ITEMS = [
-  { href: '/more/sources', label: 'Sources', note: 'connect your devices' },
+  { href: '/more/sources', label: 'Ingestors', note: 'connect your devices' },
   { href: '/more/settings', label: 'Security', note: 'passphrase and sign-in' },
+  { href: '/more/user', label: 'User', note: 'name and profile' },
+  { href: '/more/preferences', label: 'Preferences', note: 'appearance and accent' },
 ] as const;
 
 export default function MorePage() {
@@ -28,7 +28,7 @@ export default function MorePage() {
       </div>
 
       <div className="screen screen--flush more-menu">
-        <MoreGroup items={PERSONAL_ITEMS} />
+        <MoreGroup items={MAIN_ITEMS} />
         <MoreGroup items={SYSTEM_ITEMS} separated />
       </div>
 

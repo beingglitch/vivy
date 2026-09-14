@@ -38,7 +38,7 @@ export default async function SourcePage({ params }: { params: Promise<{ id: str
         <div className="header__row">
           <div className="header__titles">
             <Link href="/more/sources" className="src__back">
-              ← Sources
+              ← Ingestors
             </Link>
             <h1 className="title">{source.name}</h1>
             <span className="subtitle">{source.summary}</span>

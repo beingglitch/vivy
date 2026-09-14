@@ -40,7 +40,7 @@ export function StepCard({ source }: { source: IngestSource }) {
         <p className="ob__soonNote">
           <strong>Coming soon.</strong> This collector is not built yet, so there is nothing to
           connect today. Here is what it will do and what it will ask for, so you know what is
-          coming, it will appear in More &rarr; Sources with working steps when it ships.
+          coming, it will appear in More &rarr; Ingestors with working steps when it ships.
         </p>
       ) : null}
 
@@ -151,8 +151,8 @@ export function StepCard({ source }: { source: IngestSource }) {
       </div>
 
       <p className="ob__escape">
-        Nothing here is required. Everything you skip stays in <strong>More → Sources</strong> with
-        the same instructions.
+        Nothing here is required. Everything you skip stays in <strong>More → Ingestors</strong>{' '}
+        with the same instructions.
       </p>
     </div>
   );

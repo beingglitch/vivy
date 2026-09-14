@@ -12,7 +12,7 @@ import { AndroidApp } from '../settings/android-app';
 export const dynamic = 'force-dynamic';
 
 /**
- * Sources.
+ * Ingestors.
  *
  * The permanent home of everything onboarding offers. Skipping in the flow puts
  * a source here rather than losing it, which is what makes "skip" safe to press:
@@ -21,7 +21,7 @@ export const dynamic = 'force-dynamic';
  * Status is stated plainly and never scolds. A skipped source reads "skipped",
  * not "incomplete".
  */
-export default async function SourcesPage() {
+export default async function IngestorsPage() {
   const userId = await requirePageUserId();
   const [steps, lookup, phones, head] = await Promise.all([
     loadSteps(userId),
@@ -38,7 +38,7 @@ export default async function SourcesPage() {
       <div className="header">
         <div className="header__row">
           <div className="header__titles">
-            <h1 className="title">Sources</h1>
+            <h1 className="title">Ingestors</h1>
             <span className="subtitle">
               {connected} of {steps.length} connected
             </span>

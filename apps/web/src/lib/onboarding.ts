@@ -8,7 +8,7 @@ import { db, onboardingSteps } from '@vivy/db';
  *
  * Every step is optional. The states that matter are the ones that are not
  * "done": `skipped` means stop asking, `scheduled` means ask again at a time the
- * user picked. Neither is a dead end. More > Sources lists all of them with the
+ * user picked. Neither is a dead end. More > Ingestors lists all of them with the
  * same instructions, so nothing is ever lost by dismissing a prompt.
  */
 
