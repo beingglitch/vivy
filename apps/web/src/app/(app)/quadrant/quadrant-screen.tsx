@@ -4,7 +4,6 @@ import { useRef, useState, useTransition } from 'react';
 import type { Area } from '@/lib/areas';
 import type { Task } from '@/lib/tasks';
 import { EFFORTS, IMPORTANCE, quadrantFor, unplace } from '@/lib/task-scales';
-import { PlusIcon } from '@/components/icons';
 import { archiveTask, completeTask, removeTask } from './actions';
 import { TaskForm } from './task-form';
 
@@ -61,29 +60,15 @@ export function QuadrantScreen({ tasks, areas }: { tasks: Task[]; areas: Area[] 
                 : `${tasks.length} open task${tasks.length === 1 ? '' : 's'}`}
             </span>
           </div>
-          <div className="header__actions">
-            <button
-              type="button"
-              className="quadrant-filter"
-              aria-expanded={filtering}
-              onClick={() => setFiltering((current) => !current)}
-            >
-              <span
-                className="dot"
-                style={{ background: selectedArea?.colour ?? 'var(--accent)' }}
-              />
-              <span>{selectedArea?.name ?? 'All areas'}</span>
-            </button>
-            <button
-              className="iconbtn iconbtn--solid"
-              aria-label={draft ? 'Cancel' : 'New task'}
-              onClick={() => {
-                setDraft(draft ? null : { importance: 2, effortMinutes: 30 });
-              }}
-            >
-              <PlusIcon />
-            </button>
-          </div>
+          <button
+            type="button"
+            className="quadrant-filter"
+            aria-expanded={filtering}
+            onClick={() => setFiltering((current) => !current)}
+          >
+            <span className="dot" style={{ background: selectedArea?.colour ?? 'var(--accent)' }} />
+            <span>{selectedArea?.name ?? 'All areas'}</span>
+          </button>
         </div>
       </div>
 
@@ -159,12 +144,6 @@ export function QuadrantScreen({ tasks, areas }: { tasks: Task[]; areas: Area[] 
           <span className="axis-x__label">Time to finish</span>
           <span>24 h</span>
         </div>
-
-        <p className="quadrant__note">
-          {tasks.length === 0
-            ? 'Tap anywhere on the grid to add a task there. Left is quick, top is important.'
-            : 'Tap a task to finish it. Hold it to edit, or use the list to swipe.'}
-        </p>
 
         {draft ? (
           <TaskForm

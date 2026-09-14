@@ -187,279 +187,292 @@ export function TaskForm({
     kind === 'none' || dueMode === 'date' ? null : dueMode === 'tomorrow' ? 'day' : relativeUnit;
 
   return (
-    <div className="areaform">
-      <div className="field">
-        <label className="field__label" htmlFor="t-title">
-          Task
-        </label>
-        <input
-          id="t-title"
-          className="field__input"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="What needs doing?"
-          autoComplete="off"
-          autoFocus
-        />
-      </div>
+    <div className="sheet-backdrop" role="presentation">
+      <div className="areaform task-sheet" role="dialog" aria-modal="true">
+        <div className="sheet-handle" aria-hidden />
+        <div className="sheet-heading">
+          <span>{task ? 'Edit task' : 'Place this task'}</span>
+        </div>
+        <div className="field">
+          <label className="field__label" htmlFor="t-title">
+            Task
+          </label>
+          <input
+            id="t-title"
+            className="field__input"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="What needs doing?"
+            autoComplete="off"
+            autoFocus
+          />
+        </div>
 
-      {areas.length > 0 ? (
-        <>
-          <span className="field__label">Area</span>
-          <div className="chips">
-            {areas.map((a) => (
+        {areas.length > 0 ? (
+          <>
+            <span className="field__label">Area</span>
+            <div className="chips">
+              {areas.map((a) => (
+                <button
+                  type="button"
+                  key={a.id}
+                  className={`chip${a.id === areaId ? ' chip--on' : ''}`}
+                  onClick={() => setAreaId(a.id)}
+                >
+                  {a.name}
+                </button>
+              ))}
               <button
                 type="button"
-                key={a.id}
-                className={`chip${a.id === areaId ? ' chip--on' : ''}`}
-                onClick={() => setAreaId(a.id)}
+                className={`chip${areaId === null ? ' chip--on' : ''}`}
+                onClick={() => setAreaId(null)}
               >
-                {a.name}
+                Unfiled
+              </button>
+            </div>
+          </>
+        ) : null}
+
+        <div className="task-quadrants">
+          <span className="field__label">Quadrant</span>
+          <div className="task-quadrants__grid">
+            {[
+              { value: 'top-left', label: 'Important · quick', importance: 4, effort: 30 },
+              { value: 'top-right', label: 'Important · longer', importance: 4, effort: 240 },
+              { value: 'bottom-left', label: 'Less important · quick', importance: 1, effort: 30 },
+              {
+                value: 'bottom-right',
+                label: 'Less important · longer',
+                importance: 1,
+                effort: 240,
+              },
+            ].map((option) => (
+              <button
+                type="button"
+                key={option.value}
+                className={`task-quadrants__option${
+                  quadrantFor(importance, effort) === option.value
+                    ? ' task-quadrants__option--on'
+                    : ''
+                }`}
+                onClick={() => updateScales(option.importance, option.effort)}
+              >
+                {option.label}
               </button>
             ))}
-            <button
-              type="button"
-              className={`chip${areaId === null ? ' chip--on' : ''}`}
-              onClick={() => setAreaId(null)}
-            >
-              Unfiled
-            </button>
           </div>
-        </>
-      ) : null}
+        </div>
 
-      <div className="task-quadrants">
-        <span className="field__label">Quadrant</span>
-        <div className="task-quadrants__grid">
-          {[
-            { value: 'top-left', label: 'Important · quick', importance: 4, effort: 30 },
-            { value: 'top-right', label: 'Important · longer', importance: 4, effort: 240 },
-            { value: 'bottom-left', label: 'Less important · quick', importance: 1, effort: 30 },
-            { value: 'bottom-right', label: 'Less important · longer', importance: 1, effort: 240 },
-          ].map((option) => (
+        <div className="task-scale">
+          <div className="task-scale__head">
+            <span className="field__label">Y · Importance</span>
+            <strong>{IMPORTANCE.find((option) => option.value === importance)?.label}</strong>
+          </div>
+          <input
+            className="task-scale__range"
+            type="range"
+            min={1}
+            max={4}
+            step={1}
+            value={importance}
+            onChange={(event) => updateScales(Number(event.target.value), effort)}
+            aria-label="Y importance"
+          />
+          <div className="task-scale__ends">
+            <span>Low</span>
+            <span>Critical</span>
+          </div>
+        </div>
+
+        <div className="task-scale">
+          <div className="task-scale__head">
+            <span className="field__label">X · Time to finish</span>
+            <strong>{formatEffort(effort)}</strong>
+          </div>
+          <input
+            className="task-scale__range"
+            type="range"
+            min={0}
+            max={100}
+            step={1}
+            value={effortProgress(effort)}
+            onChange={(event) =>
+              updateScales(importance, effortFromProgress(Number(event.target.value)))
+            }
+            aria-label="X time to finish"
+          />
+          <div className="task-scale__ends">
+            <span>5 min</span>
+            <span>24 h</span>
+          </div>
+        </div>
+
+        <span className="field__label">Deadline</span>
+        <div className="chips">
+          {deadlineOptions.map((option, index) => (
             <button
               type="button"
               key={option.value}
-              className={`task-quadrants__option${
-                quadrantFor(importance, effort) === option.value
-                  ? ' task-quadrants__option--on'
-                  : ''
-              }`}
-              onClick={() => updateScales(option.importance, option.effort)}
+              className={`chip${option.value === kind ? ' chip--on' : ''}`}
+              onClick={() => setKind(option.value)}
+              onPointerDown={(event) => startDeadlineHold(event, option.value)}
+              onPointerMove={moveDeadlineHold}
+              onPointerUp={stopDeadlineHold}
+              onPointerCancel={stopDeadlineHold}
+              onContextMenu={(event) => event.preventDefault()}
             >
               {option.label}
+              {index === 0 ? ' · default' : ''}
             </button>
           ))}
         </div>
-      </div>
+        {DEADLINE_KINDS.find((deadline) => deadline.value === kind)?.hint ? (
+          <p className="formhint">
+            {DEADLINE_KINDS.find((deadline) => deadline.value === kind)?.hint}
+          </p>
+        ) : null}
 
-      <div className="task-scale">
-        <div className="task-scale__head">
-          <span className="field__label">Y · Importance</span>
-          <strong>{IMPORTANCE.find((option) => option.value === importance)?.label}</strong>
-        </div>
-        <input
-          className="task-scale__range"
-          type="range"
-          min={1}
-          max={4}
-          step={1}
-          value={importance}
-          onChange={(event) => updateScales(Number(event.target.value), effort)}
-          aria-label="Y importance"
-        />
-        <div className="task-scale__ends">
-          <span>Low</span>
-          <span>Critical</span>
-        </div>
-      </div>
+        {kind !== 'none' ? (
+          <>
+            <div className="chips">
+              <button
+                type="button"
+                className={`chip${dueMode === 'tomorrow' ? ' chip--on' : ''}`}
+                onClick={() => setDueMode('tomorrow')}
+              >
+                Tomorrow
+              </button>
+              <button
+                type="button"
+                className={`chip${dueMode === 'date' ? ' chip--on' : ''}`}
+                onClick={() => setDueMode('date')}
+              >
+                On a date
+              </button>
+              <button
+                type="button"
+                className={`chip${relative ? ' chip--on' : ''}`}
+                onClick={() => setDueMode('relative')}
+              >
+                In…
+              </button>
+            </div>
 
-      <div className="task-scale">
-        <div className="task-scale__head">
-          <span className="field__label">X · Time to finish</span>
-          <strong>{formatEffort(effort)}</strong>
-        </div>
-        <input
-          className="task-scale__range"
-          type="range"
-          min={0}
-          max={100}
-          step={1}
-          value={effortProgress(effort)}
-          onChange={(event) =>
-            updateScales(importance, effortFromProgress(Number(event.target.value)))
-          }
-          aria-label="X time to finish"
-        />
-        <div className="task-scale__ends">
-          <span>5 min</span>
-          <span>24 h</span>
-        </div>
-      </div>
+            {relative ? (
+              <div className="relative-due">
+                <input
+                  className="field__input relative-due__amount"
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  max={365}
+                  value={relativeAmount}
+                  onChange={(event) => {
+                    const value = Number(event.target.value);
+                    setRelativeAmount(
+                      Number.isFinite(value) ? Math.min(365, Math.max(1, value)) : 1,
+                    );
+                  }}
+                  aria-label="Deadline amount"
+                />
+                <div className="chips">
+                  {['day', 'week', 'month'].map((unit) => (
+                    <button
+                      type="button"
+                      key={unit}
+                      className={`chip${relativeUnit === unit ? ' chip--on' : ''}`}
+                      onClick={() => setRelativeUnit(unit)}
+                    >
+                      {unit}
+                      {relativeAmount === 1 ? '' : 's'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : dueMode === 'date' ? (
+              <input
+                type="date"
+                className="field__input"
+                value={date}
+                onChange={(event) => setDate(event.target.value)}
+              />
+            ) : null}
+          </>
+        ) : null}
 
-      <span className="field__label">Deadline</span>
-      <div className="chips">
-        {deadlineOptions.map((option, index) => (
+        <span className="field__label">Place</span>
+        <div className="chips">
           <button
             type="button"
-            key={option.value}
-            className={`chip${option.value === kind ? ' chip--on' : ''}`}
-            onClick={() => setKind(option.value)}
-            onPointerDown={(event) => startDeadlineHold(event, option.value)}
-            onPointerMove={moveDeadlineHold}
-            onPointerUp={stopDeadlineHold}
-            onPointerCancel={stopDeadlineHold}
-            onContextMenu={(event) => event.preventDefault()}
+            className={`chip${place ? ' chip--on' : ''}`}
+            onClick={() => setChoosingPlace(true)}
           >
-            {option.label}
-            {index === 0 ? ' · default' : ''}
+            {place ? 'Change place on map' : 'Use my location'}
           </button>
-        ))}
-      </div>
-      {DEADLINE_KINDS.find((deadline) => deadline.value === kind)?.hint ? (
-        <p className="formhint">
-          {DEADLINE_KINDS.find((deadline) => deadline.value === kind)?.hint}
-        </p>
-      ) : null}
+          <button
+            type="button"
+            className={`chip${place === null ? ' chip--on' : ''}`}
+            onClick={() => setPlace(null)}
+          >
+            Anywhere
+          </button>
+        </div>
 
-      {kind !== 'none' ? (
-        <>
-          <div className="chips">
-            <button
-              type="button"
-              className={`chip${dueMode === 'tomorrow' ? ' chip--on' : ''}`}
-              onClick={() => setDueMode('tomorrow')}
-            >
-              Tomorrow
-            </button>
-            <button
-              type="button"
-              className={`chip${dueMode === 'date' ? ' chip--on' : ''}`}
-              onClick={() => setDueMode('date')}
-            >
-              On a date
-            </button>
-            <button
-              type="button"
-              className={`chip${relative ? ' chip--on' : ''}`}
-              onClick={() => setDueMode('relative')}
-            >
-              In…
-            </button>
-          </div>
+        {place ? (
+          <p className="formhint">
+            {place.label} · {place.lat.toFixed(6)}, {place.lng.toFixed(6)} · radius {radius} m
+          </p>
+        ) : null}
 
-          {relative ? (
-            <div className="relative-due">
-              <input
-                className="field__input relative-due__amount"
-                type="number"
-                inputMode="numeric"
-                min={1}
-                max={365}
-                value={relativeAmount}
-                onChange={(event) => {
-                  const value = Number(event.target.value);
-                  setRelativeAmount(Number.isFinite(value) ? Math.min(365, Math.max(1, value)) : 1);
-                }}
-                aria-label="Deadline amount"
-              />
-              <div className="chips">
-                {['day', 'week', 'month'].map((unit) => (
-                  <button
-                    type="button"
-                    key={unit}
-                    className={`chip${relativeUnit === unit ? ' chip--on' : ''}`}
-                    onClick={() => setRelativeUnit(unit)}
-                  >
-                    {unit}
-                    {relativeAmount === 1 ? '' : 's'}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : dueMode === 'date' ? (
-            <input
-              type="date"
-              className="field__input"
-              value={date}
-              onChange={(event) => setDate(event.target.value)}
-            />
-          ) : null}
-        </>
-      ) : null}
+        {choosingPlace ? (
+          <LocationPicker
+            value={place}
+            radius={radius}
+            onClose={() => setChoosingPlace(false)}
+            onChoose={(nextPlace, nextRadius) => {
+              setPlace(nextPlace);
+              setRadius(nextRadius);
+              setChoosingPlace(false);
+            }}
+          />
+        ) : null}
 
-      <span className="field__label">Place</span>
-      <div className="chips">
-        <button
-          type="button"
-          className={`chip${place ? ' chip--on' : ''}`}
-          onClick={() => setChoosingPlace(true)}
-        >
-          {place ? 'Change place on map' : 'Use my location'}
-        </button>
-        <button
-          type="button"
-          className={`chip${place === null ? ' chip--on' : ''}`}
-          onClick={() => setPlace(null)}
-        >
-          Anywhere
-        </button>
-      </div>
+        {error ? <p className="pair__error">{error}</p> : null}
 
-      {place ? (
-        <p className="formhint">
-          {place.label} · {place.lat.toFixed(6)}, {place.lng.toFixed(6)} · radius {radius} m
-        </p>
-      ) : null}
-
-      {choosingPlace ? (
-        <LocationPicker
-          value={place}
-          radius={radius}
-          onClose={() => setChoosingPlace(false)}
-          onChoose={(nextPlace, nextRadius) => {
-            setPlace(nextPlace);
-            setRadius(nextRadius);
-            setChoosingPlace(false);
-          }}
-        />
-      ) : null}
-
-      {error ? <p className="pair__error">{error}</p> : null}
-
-      <div className="areaform__actions">
-        <button type="button" className="btn btn--quiet" disabled={pending} onClick={onDone}>
-          Cancel
-        </button>
-        <button
-          type="button"
-          className="btn btn--primary"
-          disabled={pending || !title.trim() || (kind !== 'none' && !due)}
-          onClick={() => {
-            setError(null);
-            start(async () => {
-              const input = {
-                title,
-                areaId,
-                importance,
-                effortMinutes: effort,
-                deadlineKind: kind,
-                dueAt: due ? due.toISOString() : null,
-                dueAmount,
-                dueUnit,
-                placeLabel: place?.label ?? null,
-                lat: place?.lat ?? null,
-                lng: place?.lng ?? null,
-                radiusM: place ? radius : null,
-              };
-              const result = task ? await editTask(task.id, input) : await addTask(input);
-              if (!result.ok) return setError(result.error);
-              onDone();
-            });
-          }}
-        >
-          {pending ? 'Saving…' : task ? 'Save task' : 'Add task'}
-        </button>
+        <div className="areaform__actions">
+          <button type="button" className="btn btn--quiet" disabled={pending} onClick={onDone}>
+            {task ? 'Cancel' : 'Later'}
+          </button>
+          <button
+            type="button"
+            className="btn btn--primary"
+            disabled={pending || !title.trim() || (kind !== 'none' && !due)}
+            onClick={() => {
+              setError(null);
+              start(async () => {
+                const input = {
+                  title,
+                  areaId,
+                  importance,
+                  effortMinutes: effort,
+                  deadlineKind: kind,
+                  dueAt: due ? due.toISOString() : null,
+                  dueAmount,
+                  dueUnit,
+                  placeLabel: place?.label ?? null,
+                  lat: place?.lat ?? null,
+                  lng: place?.lng ?? null,
+                  radiusM: place ? radius : null,
+                };
+                const result = task ? await editTask(task.id, input) : await addTask(input);
+                if (!result.ok) return setError(result.error);
+                onDone();
+              });
+            }}
+          >
+            {pending ? 'Saving…' : task ? 'Save task' : 'Place task'}
+          </button>
+        </div>
       </div>
     </div>
   );

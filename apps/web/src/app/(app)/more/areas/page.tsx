@@ -1,6 +1,7 @@
 import { Dock } from '@/components/shell';
 import { listAreas } from '@/lib/areas';
 import { requirePageUserId } from '@/lib/page-session';
+import { listTasks } from '@/lib/tasks';
 import { AreasScreen } from './areas-screen';
 
 export const dynamic = 'force-dynamic';
@@ -8,15 +9,20 @@ export const dynamic = 'force-dynamic';
 /**
  * Focus areas.
  *
- * Areas group tasks and give each one a cadence, which is what lets Vivy say
- * something has gone quiet rather than just listing what is left.
+ * Areas group tasks and provide the history and open-work view for each part
+ * of life.
  */
 export default async function AreasPage() {
-  const areas = await listAreas(await requirePageUserId());
+  const userId = await requirePageUserId();
+  const [areas, openTasks, doneTasks] = await Promise.all([
+    listAreas(userId),
+    listTasks(userId),
+    listTasks(userId, 'done'),
+  ]);
 
   return (
     <>
-      <AreasScreen areas={areas} />
+      <AreasScreen areas={areas} openTasks={openTasks} doneTasks={doneTasks} />
       <Dock />
     </>
   );

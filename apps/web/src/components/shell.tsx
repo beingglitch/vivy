@@ -3,15 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
-import {
-  HomeIcon,
-  MicIcon,
-  MoneyIcon,
-  MoreIcon,
-  QuadrantIcon,
-  SendIcon,
-  TodayIcon,
-} from './icons';
+import { HomeIcon, MicIcon, MoneyIcon, MoreIcon, QuadrantIcon, SendIcon, TodayIcon } from './icons';
 
 /**
  * The persistent chrome: status bar, capture composer, tab bar.
@@ -44,7 +36,9 @@ export function TabBar() {
         const active = href === '/' ? pathname === '/' : pathname.startsWith(href);
         return (
           <Link key={href} href={href} className="tab" aria-current={active ? 'page' : undefined}>
-            <Icon />
+            <span className="tab__icon">
+              <Icon />
+            </span>
             <span>{label}</span>
           </Link>
         );

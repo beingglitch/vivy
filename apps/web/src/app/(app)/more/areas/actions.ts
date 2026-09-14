@@ -13,6 +13,7 @@ import { requireUserId } from '@/lib/session';
 export type Result = { ok: true } | { ok: false; error: string };
 
 function refresh() {
+  revalidatePath('/');
   revalidatePath('/more/areas');
   revalidatePath('/quadrant');
   revalidatePath('/today');

@@ -49,7 +49,8 @@ export function LoginForm({ initialMethod }: { initialMethod: Method }) {
     },
     // `email` is passed in rather than closed over, so switching tabs can send
     // before this callback has been recreated with the current value.
-    []);
+    [],
+  );
 
   /**
    * Switching to the code tab sends the code, when there is somewhere to send
@@ -73,7 +74,8 @@ export function LoginForm({ initialMethod }: { initialMethod: Method }) {
         else setError(result.error);
       });
     },
-    [email, router]);
+    [email, router],
+  );
 
   const showCodeBoxes = method === 'email' && codeSent;
 
@@ -99,30 +101,30 @@ export function LoginForm({ initialMethod }: { initialMethod: Method }) {
         <span className="auth__mark" aria-hidden>
           V
         </span>
-        <h1 className="auth__title">Welcome back</h1>
-        <p className="auth__sub">Choose how to sign in.</p>
+        <div className="auth__titleRow">
+          <h1 className="auth__title">Welcome back</h1>
+          <div className="seg seg--inline" role="tablist" aria-label="Sign-in method">
+            <button
+              type="button"
+              role="tab"
+              className="seg__btn"
+              aria-selected={method === 'passphrase'}
+              onClick={() => switchTo('passphrase')}
+            >
+              Passphrase
+            </button>
+            <button
+              type="button"
+              role="tab"
+              className="seg__btn"
+              aria-selected={method === 'email'}
+              onClick={() => switchTo('email')}
+            >
+              Email code
+            </button>
+          </div>
+        </div>
       </header>
-
-      <div className="seg" role="tablist" aria-label="Sign-in method">
-        <button
-          type="button"
-          role="tab"
-          className="seg__btn"
-          aria-selected={method === 'passphrase'}
-          onClick={() => switchTo('passphrase')}
-        >
-          Passphrase
-        </button>
-        <button
-          type="button"
-          role="tab"
-          className="seg__btn"
-          aria-selected={method === 'email'}
-          onClick={() => switchTo('email')}
-        >
-          Email code
-        </button>
-      </div>
 
       <div className="field">
         <label className="field__label" htmlFor="email">
