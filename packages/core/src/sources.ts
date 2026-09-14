@@ -60,7 +60,8 @@ export const SOURCES: readonly IngestSource[] = [
       'Every YouTube video you watch, with its title and channel',
       'Instagram and X sessions',
     ],
-    withoutIt: 'No desktop browsing or YouTube history. This is the only reliable source for either.',
+    withoutIt:
+      'No desktop browsing or YouTube history. This is the only reliable source for either.',
     minutes: 5,
     requires: ['Chrome on this machine'],
     steps: [
@@ -78,7 +79,7 @@ export const SOURCES: readonly IngestSource[] = [
       {
         title: 'Pair it',
         detail:
-          'Open the extension\'s options page and paste the endpoint, a device id, and the token below. The token is shown once.',
+          "Open the extension's options page and paste the endpoint, a device id, and the token below. The token is shown once.",
       },
     ],
   },
@@ -143,7 +144,8 @@ export const SOURCES: readonly IngestSource[] = [
     steps: [
       {
         title: 'Install ActivityWatch',
-        detail: 'It already solves window tracking and idle detection, and exposes a local API on port 5600.',
+        detail:
+          'It already solves window tracking and idle detection, and exposes a local API on port 5600.',
         link: { label: 'activitywatch.net', href: 'https://activitywatch.net/downloads/' },
       },
       {
@@ -159,7 +161,7 @@ export const SOURCES: readonly IngestSource[] = [
     platform: 'server',
     availability: 'planned',
     summary: 'Monthly bank and card statements, and your investment CAS.',
-    unlocks: ['money.spend', 'money.networth'],
+    unlocks: ['money.spend'],
     gives: [
       'Authoritative monthly balances that correct any transaction the SMS parser missed',
       'Credit card outstanding from the statement itself',
@@ -169,9 +171,13 @@ export const SOURCES: readonly IngestSource[] = [
       'Spending still works from SMS, but nothing corrects it, small errors accumulate with nothing to catch them.',
     minutes: 5,
     requires: ['Read-only access to your Gmail'],
-    seesNote: 'Scoped to searching for statement emails. Vivy never sends mail and never reads unrelated threads.',
+    seesNote:
+      'Scoped to searching for statement emails. Vivy never sends mail and never reads unrelated threads.',
     steps: [
-      { title: 'Connect Gmail', detail: 'Read-only, revocable from your Google account at any time.' },
+      {
+        title: 'Connect Gmail',
+        detail: 'Read-only, revocable from your Google account at any time.',
+      },
       {
         title: 'Add statement passwords',
         detail:
@@ -185,7 +191,7 @@ export const SOURCES: readonly IngestSource[] = [
     platform: 'server',
     availability: 'planned',
     summary: 'What shares you own, valued daily.',
-    unlocks: ['money.networth'],
+    unlocks: [],
     gives: [
       'Your holdings and positions, read-only',
       'Daily portfolio value using free end-of-day prices from the NSE',
@@ -211,7 +217,10 @@ export const SOURCES: readonly IngestSource[] = [
     availability: 'planned',
     summary: 'What you published on YouTube, Instagram and X.',
     unlocks: ['social.posts'],
-    gives: ['Your uploads and posts, counted per day', 'Views and likes where the platform exposes them'],
+    gives: [
+      'Your uploads and posts, counted per day',
+      'Views and likes where the platform exposes them',
+    ],
     withoutIt: 'The "posts shipped" stream stays empty.',
     minutes: 10,
     requires: ['A Google account for YouTube', 'An Instagram Business or Creator account'],
@@ -223,7 +232,10 @@ export const SOURCES: readonly IngestSource[] = [
         title: 'Connect Instagram',
         detail: 'Requires switching your account to Creator, which is free and reversible.',
       },
-      { title: 'X', detail: 'Read access is paid, so this falls back to reading your own profile page.' },
+      {
+        title: 'X',
+        detail: 'Read access is paid, so this falls back to reading your own profile page.',
+      },
     ],
   },
   {

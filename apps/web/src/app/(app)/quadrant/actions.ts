@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { createTask, deleteTask, setTaskStatus, updateTask } from '@/lib/tasks';
+import { createTask, deleteTask, moveTaskToTomorrow, setTaskStatus, updateTask } from '@/lib/tasks';
 import { requireUserId } from '@/lib/session';
 
 export type Result = { ok: true } | { ok: false; error: string };
@@ -105,5 +105,15 @@ export async function removeTask(taskId: string): Promise<Result> {
     return { ok: true };
   } catch {
     return { ok: false, error: 'Could not delete that task.' };
+  }
+}
+
+export async function moveTomorrow(taskId: string): Promise<Result> {
+  try {
+    await moveTaskToTomorrow(await requireUserId(), taskId);
+    refresh();
+    return { ok: true };
+  } catch {
+    return { ok: false, error: 'Could not move that task.' };
   }
 }

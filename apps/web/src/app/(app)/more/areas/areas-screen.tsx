@@ -1,138 +1,70 @@
 'use client';
 
-import { useMemo, useRef, useState, useTransition } from 'react';
-import { ChevronIcon, MoreIcon, PlusIcon } from '@/components/icons';
+import { useEffect, useRef, useState, useTransition } from 'react';
+import { PlusIcon } from '@/components/icons';
 import { AREA_COLOURS } from '@/lib/area-colours';
 import type { Area } from '@/lib/areas';
 import type { Task } from '@/lib/tasks';
-import { addArea, deleteArea, editArea, removeArea, resumeArea } from './actions';
+import { addArea, deleteArea, editArea, removeArea, reorderAreaList, resumeArea } from './actions';
 
 type Sheet = 'create' | 'edit' | 'delete' | null;
 
 export function AreasScreen({
   areas,
   allAreas,
-  openTasks,
   doneTasks,
 }: {
   areas: Area[];
   allAreas: Area[];
-  openTasks: Task[];
   doneTasks: Task[];
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [sheet, setSheet] = useState<Sheet>(null);
-  const [managing, setManaging] = useState(true);
   const selected = allAreas.find((area) => area.id === selectedId) ?? null;
   const usedColours = areas.map((area) => area.colour);
 
-  if (selected) {
-    return (
-      <>
-        <AreaDetail
-          area={selected}
-          openTasks={openTasks.filter((task) => task.areaId === selected.id)}
-          doneTasks={doneTasks.filter((task) => task.areaId === selected.id)}
-          onBack={() => setSelectedId(null)}
-          onEdit={() => setSheet('edit')}
-        />
-        {sheet === 'edit' ? (
-          <AreaForm
-            area={selected}
-            usedColours={usedColours.filter((colour) => colour !== selected.colour)}
-            onDelete={() => setSheet('delete')}
-            onDone={() => setSheet(null)}
-          />
-        ) : null}
-        {sheet === 'delete' ? (
-          <DeleteAreaSheet
-            area={selected}
-            doneTasks={doneTasks.filter((task) => task.areaId === selected.id).length}
-            targetAreas={areas.filter((area) => area.id !== selected.id)}
-            onDone={() => {
-              setSheet(null);
-              setSelectedId(null);
-            }}
-            onCancel={() => setSheet('edit')}
-          />
-        ) : null}
-      </>
-    );
-  }
-
-  const openCount = areas.reduce((total, area) => total + area.openTasks, 0);
-
   return (
     <>
-      <div className="header areas-header">
-        <div className="header__row">
-          <div className="header__titles">
-            <h1 className="title">Focus areas</h1>
-            <button
-              type="button"
-              className="subtitle areas-header__manage"
-              onClick={() => setManaging(true)}
-            >
-              {areas.length} area{areas.length === 1 ? '' : 's'} · {openCount} open
-            </button>
-          </div>
-          <button
-            className="iconbtn"
-            aria-label="New focus area"
-            onClick={() => setSheet('create')}
-          >
-            <PlusIcon />
-          </button>
-        </div>
-      </div>
-
-      <div className="screen screen--flush">
-        <ul className="area-index">
-          {areas.map((area) => (
-            <li key={area.id}>
-              <button
-                type="button"
-                className="area-index__row"
-                onClick={() => setSelectedId(area.id)}
-              >
-                <span className="dot" style={{ background: area.colour }} />
-                <span className="area-index__name">{area.name}</span>
-                <span className="area-index__cadence">{cadenceLabel(area.cadenceDays)}</span>
-                <span className="area-index__status">
-                  {area.openTasks === 0 ? 'clear' : `${area.openTasks} open`}
-                </span>
-                <ChevronIcon />
-              </button>
-            </li>
-          ))}
-        </ul>
-
-        {areas.length === 0 ? (
-          <button type="button" className="area-index__empty" onClick={() => setSheet('create')}>
-            <PlusIcon />
-            <span>Create your first focus area</span>
-          </button>
-        ) : null}
-      </div>
+      <ManageAreas
+        areas={allAreas}
+        doneTasks={doneTasks}
+        onNew={() => setSheet('create')}
+        onEdit={(areaId) => {
+          setSelectedId(areaId);
+          setSheet('edit');
+        }}
+        onDelete={(areaId) => {
+          setSelectedId(areaId);
+          setSheet('delete');
+        }}
+      />
 
       {sheet === 'create' ? (
         <AreaForm usedColours={usedColours} onDone={() => setSheet(null)} />
       ) : null}
-      {managing ? (
-        <ManageAreas
-          areas={allAreas}
-          doneTasks={doneTasks}
-          onDone={() => setManaging(false)}
-          onNew={() => setSheet('create')}
-          onEdit={(areaId) => {
-            setSelectedId(areaId);
-            setManaging(false);
-            setSheet('edit');
+      {sheet === 'edit' && selected ? (
+        <AreaForm
+          area={selected}
+          usedColours={usedColours.filter((colour) => colour !== selected.colour)}
+          onDelete={() => setSheet('delete')}
+          onDone={() => {
+            setSheet(null);
+            setSelectedId(null);
           }}
-          onDelete={(areaId) => {
-            setSelectedId(areaId);
-            setManaging(false);
-            setSheet('delete');
+        />
+      ) : null}
+      {sheet === 'delete' && selected ? (
+        <DeleteAreaSheet
+          area={selected}
+          doneTasks={doneTasks.filter((task) => task.areaId === selected.id).length}
+          targetAreas={areas.filter((area) => area.id !== selected.id)}
+          onDone={() => {
+            setSheet(null);
+            setSelectedId(null);
+          }}
+          onCancel={() => {
+            setSheet(null);
+            setSelectedId(null);
           }}
         />
       ) : null}
@@ -143,24 +75,39 @@ export function AreasScreen({
 function ManageAreas({
   areas,
   doneTasks,
-  onDone,
   onNew,
   onEdit,
   onDelete,
 }: {
   areas: Area[];
   doneTasks: Task[];
-  onDone: () => void;
   onNew: () => void;
   onEdit: (areaId: string) => void;
   onDelete: (areaId: string) => void;
 }) {
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [revealedId, setRevealedId] = useState<string | null>(null);
+  const [swipePreview, setSwipePreview] = useState<{ areaId: string; offset: number } | null>(null);
   const [order, setOrder] = useState(areas.map((area) => area.id));
+  const orderRef = useRef(order);
   const draggingId = useRef<string | null>(null);
-  const swiping = useRef<{ areaId: string; x: number; y: number } | null>(null);
+  const swiping = useRef<{ areaId: string; x: number; y: number; wasRevealed: boolean } | null>(
+    null,
+  );
   const [, start] = useTransition();
+
+  useEffect(() => {
+    setOrder((current) => {
+      const areaIds = areas.map((area) => area.id);
+      const next = [...current.filter((id) => areaIds.includes(id))];
+      for (const areaId of areaIds) {
+        if (!next.includes(areaId)) next.push(areaId);
+      }
+      orderRef.current = next;
+      return next;
+    });
+  }, [areas]);
+
   const orderedAreas = order.flatMap((id) => {
     const area = areas.find((candidate) => candidate.id === id);
     return area ? [area] : [];
@@ -188,7 +135,14 @@ function ManageAreas({
       const targetIndex = current.indexOf(target);
       const next = current.filter((id) => id !== source);
       next.splice(targetIndex < 0 ? next.length : targetIndex, 0, source);
+      orderRef.current = next;
       return next;
+    });
+  }
+
+  function saveOrder() {
+    start(async () => {
+      await reorderAreaList(orderRef.current);
     });
   }
 
@@ -224,6 +178,11 @@ function ManageAreas({
           className={`manage-area-row${paused ? ' manage-area-row--paused' : ''}${
             revealed ? ' manage-area-row--revealed' : ''
           }`}
+          style={
+            swipePreview?.areaId === area.id
+              ? { transform: `translateX(${swipePreview.offset}px)`, transition: 'none' }
+              : undefined
+          }
         >
           <button
             type="button"
@@ -241,6 +200,7 @@ function ManageAreas({
             }}
             onPointerUp={() => {
               draggingId.current = null;
+              saveOrder();
             }}
             onPointerCancel={() => {
               draggingId.current = null;
@@ -258,20 +218,47 @@ function ManageAreas({
             type="button"
             className="manage-area-row__body"
             onPointerDown={(event) => {
-              swiping.current = { areaId: area.id, x: event.clientX, y: event.clientY };
+              if (revealedId && revealedId !== area.id) setRevealedId(null);
+              swiping.current = {
+                areaId: area.id,
+                x: event.clientX,
+                y: event.clientY,
+                wasRevealed: revealed,
+              };
+              event.currentTarget.setPointerCapture(event.pointerId);
+            }}
+            onPointerMove={(event) => {
+              const gesture = swiping.current;
+              if (!gesture || gesture.areaId !== area.id) return;
+              const distanceX = event.clientX - gesture.x;
+              const distanceY = event.clientY - gesture.y;
+              if (Math.abs(distanceY) > Math.abs(distanceX) && Math.abs(distanceY) > 10) {
+                setSwipePreview(null);
+                return;
+              }
+              const start = gesture.wasRevealed ? -156 : 0;
+              const offset = Math.max(-156, Math.min(0, start + distanceX));
+              setSwipePreview({ areaId: area.id, offset });
             }}
             onPointerUp={(event) => {
               const gesture = swiping.current;
               swiping.current = null;
+              setSwipePreview(null);
               if (!gesture || gesture.areaId !== area.id) return;
-              const distance = event.clientX - gesture.x;
-              if (Math.abs(event.clientY - gesture.y) > 12) return;
-              if (distance < -48) return setRevealedId(area.id);
-              if (distance > 30 || revealed) return setRevealedId(null);
+              const distanceX = event.clientX - gesture.x;
+              const distanceY = event.clientY - gesture.y;
+              if (Math.abs(distanceY) > Math.abs(distanceX) && Math.abs(distanceY) > 10) return;
+              const finalOffset = (gesture.wasRevealed ? -156 : 0) + distanceX;
+              if (Math.abs(distanceX) > 8) {
+                setRevealedId(finalOffset <= -48 ? area.id : null);
+                return;
+              }
+              if (revealed) return setRevealedId(null);
               onEdit(area.id);
             }}
             onPointerCancel={() => {
               swiping.current = null;
+              setSwipePreview(null);
             }}
             onKeyDown={(event) => {
               if (event.key === 'Enter' || event.key === ' ') {
@@ -308,12 +295,9 @@ function ManageAreas({
     <div className="manage-areas">
       <div className="manage-areas__header">
         <div>
-          <h1 className="title">Manage areas</h1>
-          <span className="subtitle">Drag to reorder · switch to pause</span>
+          <h1 className="title">Focus areas</h1>
+          <span className="subtitle">Drag to reorder · swipe left for actions</span>
         </div>
-        <button type="button" onClick={onDone}>
-          Done
-        </button>
       </div>
       <div className="manage-areas__list">
         {activeAreas.map(areaRow)}
@@ -329,125 +313,6 @@ function ManageAreas({
         <PlusIcon size={16} />
         New focus area
       </button>
-    </div>
-  );
-}
-
-function AreaDetail({
-  area,
-  openTasks,
-  doneTasks,
-  onBack,
-  onEdit,
-}: {
-  area: Area;
-  openTasks: Task[];
-  doneTasks: Task[];
-  onBack: () => void;
-  onEdit: () => void;
-}) {
-  const activity = useMemo(() => {
-    const dates = Array.from({ length: 364 }, (_, index) => {
-      const date = new Date();
-      date.setHours(12, 0, 0, 0);
-      date.setDate(date.getDate() - (363 - index));
-      return date.toLocaleDateString('en-CA');
-    });
-    const counts = new Map<string, number>();
-    for (const task of doneTasks) {
-      if (!task.completedAt) continue;
-      const key = task.completedAt.toLocaleDateString('en-CA');
-      counts.set(key, (counts.get(key) ?? 0) + 1);
-    }
-    return dates.map((date) => counts.get(date) ?? 0);
-  }, [doneTasks]);
-  const max = Math.max(...activity, 1);
-  let currentStreak = 0;
-  for (let index = activity.length - 1; index >= 0 && (activity[index] ?? 0) > 0; index -= 1) {
-    currentStreak += 1;
-  }
-
-  return (
-    <>
-      <div className="area-detail__nav">
-        <button type="button" aria-label="Back to focus areas" onClick={onBack}>
-          <BackIcon />
-        </button>
-        <button type="button" className="iconbtn" aria-label={`Edit ${area.name}`} onClick={onEdit}>
-          <MoreIcon size={18} />
-        </button>
-      </div>
-      <div className="screen area-detail">
-        <div className="area-detail__title">
-          <h1 className="title">{area.name}</h1>
-          <div className="area-detail__badges">
-            <span className="area-badge area-badge--active">
-              <span className="dot dot--sm" style={{ background: area.colour }} /> Active
-            </span>
-            <span className="area-badge">{area.openTasks} open tasks</span>
-          </div>
-        </div>
-
-        <div className="area-year" aria-label="Task completion history">
-          {activity.map((value, index) => (
-            <i
-              key={index}
-              style={{
-                background:
-                  value === 0
-                    ? 'var(--line-1)'
-                    : `color-mix(in srgb, ${area.colour} ${35 + Math.round((value / max) * 65)}%, #F2F1ED)`,
-              }}
-            />
-          ))}
-        </div>
-        <div className="area-months">
-          <span>SEP</span>
-          <span>DEC</span>
-          <span>MAR</span>
-          <span>JUN</span>
-          <span>SEP</span>
-        </div>
-
-        <div className="area-detail__stats">
-          <AreaStat value={currentStreak} label="day streak" />
-          <AreaStat value={doneTasks.length} label="tasks closed" />
-          <AreaStat value={openTasks.length} label="tasks open" />
-        </div>
-
-        <section className="area-task-section">
-          <div className="area-task-section__head">
-            <strong>Open tasks</strong>
-            <span>{openTasks.length}</span>
-          </div>
-          {openTasks.map((task) => (
-            <div className="area-task" key={task.id}>
-              <span className="task__box" aria-hidden />
-              <div className="task__body">
-                <span className="task__title">{task.title}</span>
-                {task.dueAt ? (
-                  <span className="task__meta">
-                    due {task.dueAt.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
-                  </span>
-                ) : null}
-              </div>
-              <span className="task__time">{formatEffort(task.effortMinutes)}</span>
-            </div>
-          ))}
-          {openTasks.length === 0 ? (
-            <p className="area-task-section__empty">Nothing open.</p>
-          ) : null}
-        </section>
-      </div>
-    </>
-  );
-}
-
-function AreaStat({ value, label }: { value: number; label: string }) {
-  return (
-    <div>
-      <strong>{value}</strong>
-      <span>{label}</span>
     </div>
   );
 }
@@ -569,7 +434,7 @@ function AreaForm({
         </button>
         {area && onDelete ? (
           <button type="button" className="area-sheet__delete" onClick={onDelete}>
-            Archive or delete area
+            Delete focus area
           </button>
         ) : null}
       </div>
@@ -590,7 +455,6 @@ function DeleteAreaSheet({
   onDone: () => void;
   onCancel: () => void;
 }) {
-  const [choice, setChoice] = useState<'archive' | 'delete'>('archive');
   const [targetAreaId, setTargetAreaId] = useState<string | null>(targetAreas[0]?.id ?? null);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -598,10 +462,7 @@ function DeleteAreaSheet({
   function confirm() {
     setError(null);
     start(async () => {
-      const result =
-        choice === 'archive'
-          ? await removeArea(area.id, targetAreaId)
-          : await deleteArea(area.id, targetAreaId);
+      const result = await deleteArea(area.id, targetAreaId);
       if (!result.ok) return setError(result.error);
       onDone();
     });
@@ -614,30 +475,8 @@ function DeleteAreaSheet({
         <h2>Delete {area.name}?</h2>
         <p>
           {area.openTasks} open and {doneTasks} closed task{doneTasks === 1 ? '' : 's'} belong to
-          this area.
+          this area. Deleting it removes its history permanently and cannot be undone.
         </p>
-        <button
-          type="button"
-          className={`delete-choice${choice === 'archive' ? ' delete-choice--on' : ''}`}
-          onClick={() => setChoice('archive')}
-        >
-          <span className="delete-choice__radio" />
-          <span>
-            <strong>Archive it</strong>
-            <small>Keeps its history, hides it from active views, and can be resumed.</small>
-          </span>
-        </button>
-        <button
-          type="button"
-          className={`delete-choice${choice === 'delete' ? ' delete-choice--on' : ''}`}
-          onClick={() => setChoice('delete')}
-        >
-          <span className="delete-choice__radio" />
-          <span>
-            <strong>Delete permanently</strong>
-            <small>History and closed tasks go too. This cannot be undone.</small>
-          </span>
-        </button>
         {area.openTasks > 0 ? (
           <div className="delete-area-sheet__move">
             <span>
@@ -665,20 +504,18 @@ function DeleteAreaSheet({
           <button type="button" className="btn btn--quiet" onClick={onCancel}>
             Cancel
           </button>
-          <button type="button" className="btn btn--primary" disabled={pending} onClick={confirm}>
-            {pending ? 'Working…' : choice === 'archive' ? 'Archive area' : 'Delete area'}
+          <button
+            type="button"
+            className="btn delete-area-sheet__confirm"
+            disabled={pending}
+            onClick={confirm}
+          >
+            {pending ? 'Deleting…' : 'Delete permanently'}
           </button>
         </div>
       </div>
     </div>
   );
-}
-
-function formatEffort(minutes: number) {
-  if (minutes < 60) return `${minutes}m`;
-  const hours = Math.floor(minutes / 60);
-  const remainder = minutes % 60;
-  return remainder ? `${hours}h ${remainder}m` : `${hours}h`;
 }
 
 function cadenceLabel(days: number | null) {
@@ -713,24 +550,6 @@ function areaActivity(area: Area, doneTasks: Task[]) {
   if (daysAgo === 0) return { cold: false, label: 'touched today' };
   if (daysAgo > cadenceDays * 2) return { cold: true, label: `cold ${daysAgo} days` };
   return { cold: false, label: `touched ${daysAgo} day${daysAgo === 1 ? '' : 's'} ago` };
-}
-
-function BackIcon() {
-  return (
-    <svg
-      width="20"
-      height="20"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      <path d="m15 5-7 7 7 7" />
-    </svg>
-  );
 }
 
 function DragIcon() {

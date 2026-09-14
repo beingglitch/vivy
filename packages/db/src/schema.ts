@@ -320,7 +320,10 @@ export const accounts = pgTable(
     currency: text('currency').notNull().default('INR'),
     isLiability: boolean('is_liability').notNull().default(false),
     includeInNetworth: boolean('include_in_networth').notNull().default(true),
+    source: text('source').notNull().default('sms'), // sms | manual | statement | api
     archivedAt: timestamp('archived_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index('accounts_user_idx').on(t.userId)],
 );
@@ -343,14 +346,31 @@ export const txns = pgTable(
     balanceAfterMinor: integer('balance_after_minor'),
     /** How much the parser trusts this row. Drives reconciliation and review prompts. */
     confidence: real('confidence').notNull().default(1),
+    reviewStatus: text('review_status').notNull().default('pending'),
+    reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
     eventId: uuid('event_id'),
     dedupeKey: text('dedupe_key').notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
     uniqueIndex('txns_dedupe_idx').on(t.userId, t.dedupeKey),
     index('txns_account_date_idx').on(t.userId, t.accountId, t.localDate),
     index('txns_confidence_idx').on(t.userId, t.confidence),
   ],
+);
+
+/** Immutable audit trail for user corrections to parsed or manual transactions. */
+export const txnCorrections = pgTable(
+  'txn_corrections',
+  {
+    id: uuid('id').primaryKey(),
+    userId: uuid('user_id').notNull(),
+    txnId: uuid('txn_id').notNull(),
+    before: jsonb('before').notNull(),
+    after: jsonb('after').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('txn_corrections_txn_idx').on(t.userId, t.txnId, t.createdAt)],
 );
 
 /**
@@ -364,6 +384,7 @@ export const balanceSnapshots = pgTable(
     userId: uuid('user_id').notNull(),
     accountId: text('account_id').notNull(),
     asOf: date('as_of').notNull(),
+    asOfTs: timestamp('as_of_ts', { withTimezone: true }),
     balanceMinor: integer('balance_minor').notNull(),
     authority: text('authority').notNull(), // statement | broker-api | cas | manual | sms-inferred
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -422,6 +443,27 @@ export const metricsDaily = pgTable(
   (t) => [
     primaryKey({ columns: [t.userId, t.localDate, t.stream] }),
     index('metrics_stream_idx').on(t.userId, t.stream),
+  ],
+);
+
+export const streamPipelines = pgTable(
+  'stream_pipelines',
+  {
+    id: uuid('id').primaryKey(),
+    userId: uuid('user_id').notNull(),
+    key: text('key').notNull(),
+    name: text('name').notNull(),
+    colour: text('colour').notNull(),
+    graphStyle: text('graph_style').notNull().default('Curve'),
+    unit: text('unit').notNull(),
+    definition: jsonb('definition').notNull(),
+    archivedAt: timestamp('archived_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('stream_pipelines_user_key_idx').on(t.userId, t.key),
+    index('stream_pipelines_user_idx').on(t.userId, t.createdAt),
   ],
 );
 
@@ -487,6 +529,8 @@ export const areas = pgTable(
     cadenceDays: integer('cadence_days'),
     /** Whether this area's stream is visible on Home for every signed-in device. */
     showOnHome: boolean('show_on_home').notNull().default(true),
+    /** Account-wide display order across active and paused areas. */
+    sortOrder: integer('sort_order').notNull().default(0),
     /** Archived rather than deleted, so tasks that referenced it still read. */
     archivedAt: timestamp('archived_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

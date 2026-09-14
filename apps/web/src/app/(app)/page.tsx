@@ -1,5 +1,6 @@
 import { Dock } from '@/components/shell';
 import { requirePageUserId } from '@/lib/page-session';
+import { loadStreamPipelineOptions } from '@/lib/stream-pipelines';
 import { loadStreams } from '@/lib/streams-data';
 import { StreamsScreen } from './streams-screen';
 
@@ -13,10 +14,14 @@ export const dynamic = 'force-dynamic';
  * instead would mean every number on the opening screen was fiction.
  */
 export default async function HomePage() {
-  const streams = await loadStreams(await requirePageUserId());
+  const userId = await requirePageUserId();
+  const [streams, pipelineOptions] = await Promise.all([
+    loadStreams(userId),
+    loadStreamPipelineOptions(userId),
+  ]);
   return (
     <>
-      <StreamsScreen streams={streams} />
+      <StreamsScreen streams={streams} pipelineOptions={pipelineOptions} />
 
       <Dock />
     </>

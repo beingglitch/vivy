@@ -3,6 +3,7 @@
 import { useRef, useState, useTransition } from 'react';
 import type { Area } from '@/lib/areas';
 import type { Task } from '@/lib/tasks';
+import { SwipeTask } from '@/components/swipe-task';
 import {
   EFFORTS,
   IMPORTANCE,
@@ -11,7 +12,7 @@ import {
   quadrantFor,
   unplace,
 } from '@/lib/task-scales';
-import { archiveTask, completeTask, removeTask } from './actions';
+import { completeTask, moveTomorrow, removeTask } from './actions';
 import { TaskForm } from './task-form';
 
 /**
@@ -50,6 +51,7 @@ export function QuadrantScreen({
     setDraft(null);
     setDraftTitle('');
     setPlacingDetails(false);
+    setHoverPoint(null);
   }
 
   /**
@@ -75,6 +77,7 @@ export function QuadrantScreen({
     if (!draft) setDraftAreaId(areaFilter ?? areas[0]?.id ?? null);
     setEditing(null);
     setPlacingDetails(false);
+    setHoverPoint(null);
     setDraft(nextDraft);
   }
 
@@ -141,19 +144,20 @@ export function QuadrantScreen({
           <div
             className="quadrant"
             onClick={tapGrid}
-            onMouseMove={(event) => {
+            onPointerMove={(event) => {
+              if (event.pointerType !== 'mouse') return;
               const box = event.currentTarget.getBoundingClientRect();
               setHoverPoint({
                 x: Math.min(100, Math.max(0, ((event.clientX - box.left) / box.width) * 100)),
                 y: Math.min(100, Math.max(0, ((event.clientY - box.top) / box.height) * 100)),
               });
             }}
-            onMouseLeave={() => setHoverPoint(null)}
+            onPointerLeave={() => setHoverPoint(null)}
             role="presentation"
           >
             {/* Top-left is tinted: important and quick, the place to look first. */}
             <div className="quadrant__hot" />
-            {hoverPoint ? (
+            {hoverPoint && !draft ? (
               <div
                 className="quadrant__hover"
                 style={
@@ -373,75 +377,30 @@ function TaskDot({ task, onEdit }: { task: Task; onEdit: () => void }) {
 }
 
 function TaskRow({ task, onEdit }: { task: Task; onEdit: () => void }) {
-  const [pending, start] = useTransition();
-  const gesture = useRef<{ x: number; held: boolean; timer: ReturnType<typeof setTimeout> } | null>(
-    null,
-  );
-
-  function finishGesture(event: React.PointerEvent<HTMLDivElement>) {
-    const active = gesture.current;
-    if (!active) return;
-    clearTimeout(active.timer);
-    gesture.current = null;
-    if (active.held || pending) return;
-
-    const distance = event.clientX - active.x;
-    if (distance >= 72) return start(() => void archiveTask(task.id));
-    if (distance <= -72) return start(() => void removeTask(task.id));
-    start(() => void completeTask(task.id));
-  }
-
   return (
-    <div
-      className="task task--gesture"
-      role="button"
-      tabIndex={0}
-      aria-label={`${task.title}. Tap to complete, swipe right to archive, swipe left to delete, or press and hold to edit.`}
-      onPointerDown={(event) => {
-        if (pending) return;
-        gesture.current = {
-          x: event.clientX,
-          held: false,
-          timer: setTimeout(() => {
-            if (!gesture.current) return;
-            gesture.current.held = true;
-            navigator.vibrate?.(30);
-            onEdit();
-          }, 550),
-        };
-      }}
-      onPointerMove={(event) => {
-        if (!gesture.current) return;
-        if (Math.abs(event.clientX - gesture.current.x) > 10) {
-          clearTimeout(gesture.current.timer);
-        }
-      }}
-      onPointerUp={finishGesture}
-      onPointerCancel={() => {
-        if (gesture.current) clearTimeout(gesture.current.timer);
-        gesture.current = null;
-      }}
-      onKeyDown={(event) => {
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault();
-          start(() => void completeTask(task.id));
-        }
-      }}
+    <SwipeTask
+      label={task.title}
+      onTap={() => completeTask(task.id)}
+      onHold={onEdit}
+      onTomorrow={() => moveTomorrow(task.id)}
+      onDelete={() => removeTask(task.id)}
     >
-      <span className="task__box" aria-hidden />
-      <div className="task__body">
-        <span className="task__title">
-          {task.title}
-          {task.behind ? <span className="behind">behind</span> : null}
-        </span>
-        <span className="task__meta">
-          {task.areaName ? `${task.areaName} · ` : ''}
-          {importanceLabel(task.importance)} · {effortLabel(task.effortMinutes)}
-          {task.dueAt ? ` · due ${new Date(task.dueAt).toLocaleDateString('en-GB')}` : ''}
-          {task.placeLabel ? ` · ${task.placeLabel}` : ''}
-        </span>
+      <div className="task task--gesture">
+        <span className="task__box" aria-hidden />
+        <div className="task__body">
+          <span className="task__title">
+            {task.title}
+            {task.behind ? <span className="behind">behind</span> : null}
+          </span>
+          <span className="task__meta">
+            {task.areaName ? `${task.areaName} · ` : ''}
+            {importanceLabel(task.importance)} · {effortLabel(task.effortMinutes)}
+            {task.dueAt ? ` · due ${new Date(task.dueAt).toLocaleDateString('en-GB')}` : ''}
+            {task.placeLabel ? ` · ${task.placeLabel}` : ''}
+          </span>
+        </div>
       </div>
-    </div>
+    </SwipeTask>
   );
 }
 

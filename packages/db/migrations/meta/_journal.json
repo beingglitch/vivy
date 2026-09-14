@@ -50,6 +50,27 @@
       "when": 1789354042339,
       "tag": "0006_yellow_the_initiative",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1789356912080,
+      "tag": "0007_absurd_silvermane",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1789358661818,
+      "tag": "0008_red_songbird",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1789359953955,
+      "tag": "0009_public_prism",
+      "breakpoints": true
     }
   ]
 }

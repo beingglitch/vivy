@@ -258,6 +258,30 @@ export async function deleteTask(userId: string, taskId: string): Promise<void> 
     .where(and(eq(tasks.id, taskId), eq(tasks.userId, userId)));
 }
 
+export async function moveTaskToTomorrow(userId: string, taskId: string): Promise<void> {
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(23, 59, 0, 0);
+  const [task] = await db()
+    .select({ deadlineKind: tasks.deadlineKind })
+    .from(tasks)
+    .where(and(eq(tasks.id, taskId), eq(tasks.userId, userId)))
+    .limit(1);
+  if (!task) throw new Error('Task not found.');
+  await db()
+    .update(tasks)
+    .set({
+      dueAt: tomorrow,
+      deadlineKind: task.deadlineKind === 'none' ? 'persists' : task.deadlineKind,
+      dueAmount: 1,
+      dueUnit: 'day',
+      status: 'open',
+      completedAt: null,
+      updatedAt: new Date(),
+    })
+    .where(and(eq(tasks.id, taskId), eq(tasks.userId, userId)));
+}
+
 /**
  * Finished since midnight, for the Today screen.
  *

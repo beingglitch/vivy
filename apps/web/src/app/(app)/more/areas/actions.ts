@@ -5,6 +5,7 @@ import {
   archiveArea,
   createArea,
   deleteAreaPermanently,
+  reorderAreas,
   restoreArea,
   updateArea,
 } from '@/lib/areas';
@@ -72,6 +73,19 @@ export async function resumeArea(areaId: string): Promise<Result> {
     return {
       ok: false,
       error: error instanceof Error ? error.message : 'Could not resume that area.',
+    };
+  }
+}
+
+export async function reorderAreaList(areaIds: string[]): Promise<Result> {
+  try {
+    await reorderAreas(await requireUserId(), areaIds);
+    refresh();
+    return { ok: true };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'Could not reorder focus areas.',
     };
   }
 }

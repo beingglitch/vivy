@@ -1,6 +1,6 @@
 import 'server-only';
 import { randomUUID } from 'node:crypto';
-import { and, asc, eq, isNull, ne } from 'drizzle-orm';
+import { and, asc, desc, eq, isNull, ne } from 'drizzle-orm';
 import { areas, db, tasks } from '@vivy/db';
 import { AREA_COLOURS } from './area-colours';
 
@@ -27,7 +27,7 @@ export async function listAreas(userId: string): Promise<Area[]> {
     .select()
     .from(areas)
     .where(and(eq(areas.userId, userId), isNull(areas.archivedAt)))
-    .orderBy(asc(areas.createdAt));
+    .orderBy(asc(areas.sortOrder), asc(areas.createdAt));
 
   if (rows.length === 0) return [];
 
@@ -56,7 +56,7 @@ export async function listAllAreas(userId: string): Promise<Area[]> {
     .select()
     .from(areas)
     .where(eq(areas.userId, userId))
-    .orderBy(asc(areas.createdAt));
+    .orderBy(asc(areas.sortOrder), asc(areas.createdAt));
 
   if (rows.length === 0) return [];
   const theirTasks = await db().select().from(tasks).where(eq(tasks.userId, userId));
@@ -97,6 +97,14 @@ export async function createArea(
     .limit(1);
   if (sameColour.length > 0) throw new Error('That colour already belongs to another focus area.');
 
+  const [lastArea] = await db()
+    .select({ sortOrder: areas.sortOrder })
+    .from(areas)
+    .where(eq(areas.userId, userId))
+    .orderBy(desc(areas.sortOrder))
+    .limit(1);
+  const sortOrder = (lastArea?.sortOrder ?? -1) + 1;
+
   const id = randomUUID();
   const [saved] = await db()
     .insert(areas)
@@ -107,15 +115,38 @@ export async function createArea(
       colour,
       cadenceDays,
       showOnHome,
+      sortOrder,
     })
     // Names are unique per user, so re-adding one revives it rather than
     // failing with a constraint error the person cannot act on.
     .onConflictDoUpdate({
       target: [areas.userId, areas.name],
-      set: { colour, cadenceDays, showOnHome, archivedAt: null, updatedAt: new Date() },
+      set: { colour, cadenceDays, showOnHome, sortOrder, archivedAt: null, updatedAt: new Date() },
     })
     .returning({ id: areas.id });
   return saved?.id ?? id;
+}
+
+export async function reorderAreas(userId: string, areaIds: string[]): Promise<void> {
+  if (new Set(areaIds).size !== areaIds.length) throw new Error('Area order contains duplicates.');
+
+  await db().transaction(async (transaction) => {
+    const ownedAreas = await transaction
+      .select({ id: areas.id })
+      .from(areas)
+      .where(eq(areas.userId, userId));
+    const ownedIds = new Set(ownedAreas.map((area) => area.id));
+    if (areaIds.length !== ownedIds.size || areaIds.some((id) => !ownedIds.has(id))) {
+      throw new Error('Area order is incomplete.');
+    }
+
+    for (const [sortOrder, areaId] of areaIds.entries()) {
+      await transaction
+        .update(areas)
+        .set({ sortOrder, updatedAt: new Date() })
+        .where(and(eq(areas.id, areaId), eq(areas.userId, userId)));
+    }
+  });
 }
 
 export async function updateArea(

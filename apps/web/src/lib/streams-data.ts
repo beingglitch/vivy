@@ -2,6 +2,7 @@ import 'server-only';
 import { and, eq, gte, isNull } from 'drizzle-orm';
 import { STREAMS } from '@vivy/core';
 import { areas, db, metricsDaily, tasks } from '@vivy/db';
+import { loadCustomStreams } from './stream-pipelines';
 
 /**
  * What Home draws.
@@ -19,7 +20,8 @@ export interface StreamRow {
   name: string;
   dot: string;
   unit: string;
-  kind: 'metric' | 'area';
+  kind: 'metric' | 'area' | 'custom';
+  graphStyle?: 'Heatmap' | 'Curve' | 'Bars';
   /** Most recent 364 local dates, oldest first. */
   dates: string[];
   values: number[];
@@ -114,5 +116,10 @@ export async function loadStreams(userId: string): Promise<StreamRow[]> {
     values: areaValues.get(area.id) ?? Array<number>(dates.length).fill(0),
   }));
 
-  return [...metricStreams, ...focusAreaStreams];
+  let customStreams: StreamRow[] = [];
+  try {
+    customStreams = await loadCustomStreams(userId, dates);
+  } catch {}
+
+  return [...metricStreams, ...focusAreaStreams, ...customStreams];
 }

@@ -1,11 +1,19 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { Empty } from '@/components/empty';
 import { ChevronIcon, MenuIcon, PlusIcon } from '@/components/icons';
+import {
+  STREAM_COLOURS,
+  STREAM_GRAPH_STYLES,
+  type StreamPipelineDefinition,
+  type StreamPipelineOptions,
+} from '@/lib/stream-pipeline-shared';
 import type { StreamRow } from '@/lib/streams-data';
+import { addStreamPipeline } from './stream-actions';
 
-const GRAPH_STYLES = ['Heatmap', 'Curve', 'Bars'] as const;
+const GRAPH_STYLES = STREAM_GRAPH_STYLES;
 const WINDOWS = [
   { label: '30 days', days: 30 },
   { label: '3 months', days: 90 },
@@ -23,6 +31,7 @@ interface Preferences {
 }
 
 function defaultGraph(stream: StreamRow): GraphStyle {
+  if (stream.graphStyle) return stream.graphStyle;
   if (stream.key.startsWith('money.')) return 'Curve';
   if (stream.key.startsWith('media.watch.')) return 'Bars';
   return 'Heatmap';
@@ -65,7 +74,8 @@ function initialPreferences(streams: StreamRow[]): Preferences {
     .filter(
       (stream) =>
         stream.kind === 'area' ||
-        (stream.kind === 'metric' && stream.values.some((value) => value > 0)),
+        stream.kind === 'custom' ||
+        (stream.kind === 'metric' && stream.values.some((value) => value !== 0)),
     )
     .map((stream) => stream.key);
   return {
@@ -75,13 +85,20 @@ function initialPreferences(streams: StreamRow[]): Preferences {
   };
 }
 
-export function StreamsScreen({ streams }: { streams: StreamRow[] }) {
+export function StreamsScreen({
+  streams,
+  pipelineOptions,
+}: {
+  streams: StreamRow[];
+  pipelineOptions: StreamPipelineOptions;
+}) {
   const defaults = useMemo(() => initialPreferences(streams), [streams]);
   const [preferences, setPreferences] = useState<Preferences>(defaults);
   const [hydrated, setHydrated] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [building, setBuilding] = useState(false);
   const [managing, setManaging] = useState(false);
-  const [selectedAreas, setSelectedAreas] = useState<string[]>([]);
+  const [selectedStreams, setSelectedStreams] = useState<string[]>([]);
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [windowDays, setWindowDays] = useState(364);
   const [offsetDays, setOffsetDays] = useState(0);
@@ -95,7 +112,7 @@ export function StreamsScreen({ streams }: { streams: StreamRow[] }) {
       const validKeys = new Set(streams.map((stream) => stream.key));
       if (saved) {
         const accountVisibleKeys = streams
-          .filter((stream) => stream.kind === 'area')
+          .filter((stream) => stream.kind === 'area' || stream.kind === 'custom')
           .map((stream) => stream.key);
         const visibleKeys = [
           ...new Set([
@@ -135,7 +152,7 @@ export function StreamsScreen({ streams }: { streams: StreamRow[] }) {
       const stream = byKey.get(key);
       return stream ? [stream] : [];
     });
-  const focusAreas = streams.filter((stream) => stream.kind === 'area');
+  const addableStreams = streams;
   const today = new Date().toLocaleDateString('en-GB', {
     weekday: 'long',
     day: 'numeric',
@@ -143,16 +160,16 @@ export function StreamsScreen({ streams }: { streams: StreamRow[] }) {
   });
 
   function createSelectedStreams() {
-    if (selectedAreas.length === 0) return;
+    if (selectedStreams.length === 0) return;
     setPreferences((current) => {
-      const added = selectedAreas.filter((key) => !current.visibleKeys.includes(key));
+      const added = selectedStreams.filter((key) => !current.visibleKeys.includes(key));
       return {
         ...current,
         visibleKeys: [...current.visibleKeys, ...added],
         order: [...current.order, ...added],
       };
     });
-    setSelectedAreas([]);
+    setSelectedStreams([]);
     setAdding(false);
   }
 
@@ -197,7 +214,7 @@ export function StreamsScreen({ streams }: { streams: StreamRow[] }) {
             </button>
             <button
               className="iconbtn iconbtn--solid"
-              aria-label="Create streams from focus areas"
+              aria-label="Add or build streams"
               onClick={() => {
                 setAdding((current) => !current);
                 setManaging(false);
@@ -228,56 +245,74 @@ export function StreamsScreen({ streams }: { streams: StreamRow[] }) {
 
       <div className="screen screen--flush streams-screen">
         {adding ? (
-          <section className="stream-create" aria-label="Create focus area streams">
+          <section className="stream-create" aria-label="Add streams">
             <div className="stream-create__head">
               <div>
                 <strong>New streams</strong>
-                <span>Select one or more focus areas</span>
+                <span>Select metrics or focus areas</span>
               </div>
               <button type="button" onClick={() => setAdding(false)}>
                 Cancel
               </button>
             </div>
-            {focusAreas.length > 0 ? (
+            <button
+              type="button"
+              className="stream-builder-launch"
+              onClick={() => {
+                setAdding(false);
+                setBuilding(true);
+              }}
+            >
+              <PlusIcon size={18} />
+              <span>
+                <strong>Build a custom stream</strong>
+                <small>Choose a source, calculation and graph</small>
+              </span>
+            </button>
+            {addableStreams.length > 0 ? (
               <div className="stream-create__areas">
-                {focusAreas.map((area) => {
-                  const visible = preferences.visibleKeys.includes(area.key);
-                  const selected = selectedAreas.includes(area.key);
+                {addableStreams.map((stream) => {
+                  const visible = preferences.visibleKeys.includes(stream.key);
+                  const selected = selectedStreams.includes(stream.key);
                   return (
                     <button
                       type="button"
-                      key={area.key}
+                      key={stream.key}
                       className={`stream-area${selected ? ' stream-area--selected' : ''}`}
                       disabled={visible}
                       onClick={() =>
-                        setSelectedAreas((current) =>
-                          current.includes(area.key)
-                            ? current.filter((key) => key !== area.key)
-                            : [...current, area.key],
+                        setSelectedStreams((current) =>
+                          current.includes(stream.key)
+                            ? current.filter((key) => key !== stream.key)
+                            : [...current, stream.key],
                         )
                       }
                     >
-                      <span className="dot" style={{ background: area.dot }} />
-                      <span>{area.name}</span>
+                      <span className="dot" style={{ background: stream.dot }} />
+                      <span>{stream.name}</span>
                       <span className="stream-area__state">
-                        {visible ? 'Added' : selected ? 'Selected' : ''}
+                        {visible
+                          ? 'Added'
+                          : selected
+                            ? 'Selected'
+                            : stream.kind === 'metric'
+                              ? 'Metric'
+                              : ''}
                       </span>
                     </button>
                   );
                 })}
               </div>
             ) : (
-              <p className="stream-create__empty">
-                Create a focus area first, then add its stream.
-              </p>
+              <p className="stream-create__empty">No streams are available.</p>
             )}
             <button
               type="button"
               className="btn btn--primary stream-create__submit"
-              disabled={selectedAreas.length === 0}
+              disabled={selectedStreams.length === 0}
               onClick={createSelectedStreams}
             >
-              Create {selectedAreas.length || ''} stream{selectedAreas.length === 1 ? '' : 's'}
+              Add {selectedStreams.length || ''} stream{selectedStreams.length === 1 ? '' : 's'}
             </button>
           </section>
         ) : null}
@@ -294,7 +329,7 @@ export function StreamsScreen({ streams }: { streams: StreamRow[] }) {
         {visibleStreams.length === 0 ? (
           <Empty
             title="No streams yet"
-            hint="Tap + to add focus areas, or connect a source and wait for its first metric."
+            hint="Tap + to build a stream from balances, transactions, tasks or focus areas."
           />
         ) : (
           <div className="stream-list">
@@ -338,7 +373,196 @@ export function StreamsScreen({ streams }: { streams: StreamRow[] }) {
           </div>
         )}
       </div>
+      {building ? (
+        <StreamBuilder options={pipelineOptions} onClose={() => setBuilding(false)} />
+      ) : null}
     </>
+  );
+}
+
+function StreamBuilder({
+  options,
+  onClose,
+}: {
+  options: StreamPipelineOptions;
+  onClose: () => void;
+}) {
+  const router = useRouter();
+  const [name, setName] = useState('');
+  const [source, setSource] = useState<StreamPipelineDefinition['source']>('account-balances');
+  const [accountId, setAccountId] = useState('');
+  const [areaId, setAreaId] = useState('');
+  const [subtractLiabilities, setSubtractLiabilities] = useState(true);
+  const [direction, setDirection] = useState<'all' | 'debit' | 'credit'>('all');
+  const [aggregate, setAggregate] = useState<'sum' | 'count'>('sum');
+  const [graphStyle, setGraphStyle] = useState<GraphStyle>('Curve');
+  const [colour, setColour] = useState<(typeof STREAM_COLOURS)[number]>(STREAM_COLOURS[1]);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+
+  function create() {
+    const definition: StreamPipelineDefinition =
+      source === 'account-balances'
+        ? {
+            source,
+            accountIds: accountId ? [accountId] : [],
+            subtractLiabilities,
+          }
+        : source === 'transactions'
+          ? {
+              source,
+              accountIds: accountId ? [accountId] : [],
+              direction,
+              aggregate,
+            }
+          : { source, areaIds: areaId ? [areaId] : [] };
+    start(async () => {
+      const result = await addStreamPipeline({ name, colour, graphStyle, definition });
+      if (!result.ok) return setError(result.error);
+      onClose();
+      router.refresh();
+    });
+  }
+
+  return (
+    <div className="sheet-backdrop">
+      <div className="money-sheet stream-builder" role="dialog" aria-modal="true">
+        <div className="sheet-handle" aria-hidden />
+        <div className="money-sheet__head">
+          <h2>Build stream</h2>
+          <button type="button" onClick={onClose}>
+            Cancel
+          </button>
+        </div>
+        <label className="money-field">
+          <span>Name</span>
+          <input
+            value={name}
+            placeholder="e.g. Net worth"
+            autoFocus
+            onChange={(event) => setName(event.target.value)}
+          />
+        </label>
+        <label className="money-field">
+          <span>Data source</span>
+          <select
+            value={source}
+            onChange={(event) =>
+              setSource(event.target.value as StreamPipelineDefinition['source'])
+            }
+          >
+            <option value="account-balances">Account balances</option>
+            <option value="transactions">Transactions</option>
+            <option value="completed-tasks">Completed tasks</option>
+          </select>
+        </label>
+
+        {source === 'account-balances' || source === 'transactions' ? (
+          <label className="money-field">
+            <span>Account scope</span>
+            <select value={accountId} onChange={(event) => setAccountId(event.target.value)}>
+              <option value="">
+                {source === 'account-balances' ? 'All net-worth accounts' : 'All accounts'}
+              </option>
+              {options.accounts.map((account) => (
+                <option key={account.id} value={account.id}>
+                  {account.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : (
+          <label className="money-field">
+            <span>Focus area</span>
+            <select value={areaId} onChange={(event) => setAreaId(event.target.value)}>
+              <option value="">All focus areas</option>
+              {options.areas.map((area) => (
+                <option key={area.id} value={area.id}>
+                  {area.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+
+        {source === 'account-balances' ? (
+          <label className="money-check-row">
+            <input
+              type="checkbox"
+              checked={subtractLiabilities}
+              onChange={(event) => setSubtractLiabilities(event.target.checked)}
+            />
+            Subtract loans, cards and personal debts
+          </label>
+        ) : null}
+        {source === 'transactions' ? (
+          <div className="money-field-row">
+            <label className="money-field">
+              <span>Direction</span>
+              <select
+                value={direction}
+                onChange={(event) => setDirection(event.target.value as 'all' | 'debit' | 'credit')}
+              >
+                <option value="all">All</option>
+                <option value="debit">Spend</option>
+                <option value="credit">Income</option>
+              </select>
+            </label>
+            <label className="money-field">
+              <span>Calculate</span>
+              <select
+                value={aggregate}
+                onChange={(event) => setAggregate(event.target.value as 'sum' | 'count')}
+              >
+                <option value="sum">Total amount</option>
+                <option value="count">Count</option>
+              </select>
+            </label>
+          </div>
+        ) : null}
+
+        <div className="stream-builder__section">
+          <span>Graph</span>
+          <div className="stream-editor__styles">
+            {GRAPH_STYLES.map((style) => (
+              <button
+                type="button"
+                className="chip"
+                aria-selected={graphStyle === style}
+                key={style}
+                onClick={() => setGraphStyle(style)}
+              >
+                {style}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="stream-builder__section">
+          <span>Colour</span>
+          <div className="stream-builder__colours">
+            {STREAM_COLOURS.map((option) => (
+              <button
+                type="button"
+                key={option}
+                className={colour === option ? 'stream-builder__colour--on' : ''}
+                style={{ background: option }}
+                aria-label={`Choose ${option}`}
+                onClick={() => setColour(option)}
+              />
+            ))}
+          </div>
+        </div>
+        {error ? <p className="pair__error">{error}</p> : null}
+        <button
+          type="button"
+          className="btn btn--primary money-sheet__save"
+          disabled={pending || !name.trim()}
+          onClick={create}
+        >
+          {pending ? 'Creating…' : 'Create stream'}
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -378,6 +602,7 @@ function StreamCard({
   const dates = stream.dates.slice(start, end);
   const max = Math.max(...values, 0);
   const min = values.length > 0 ? Math.min(...values) : 0;
+  const magnitudeMax = Math.max(...values.map(Math.abs), 0);
   const streak = streaks(values);
   const currentValue = values.at(-1) ?? 0;
   const startLabel = dates[0]
@@ -474,10 +699,14 @@ function StreamCard({
         }}
       >
         {graphStyle === 'Heatmap' ? (
-          <Heatmap values={values} max={max} colour={stream.dot} />
+          <Heatmap values={values} max={magnitudeMax} colour={stream.dot} />
         ) : null}
-        {graphStyle === 'Curve' ? <Curve values={values} max={max} colour={stream.dot} /> : null}
-        {graphStyle === 'Bars' ? <Bars values={values} max={max} colour={stream.dot} /> : null}
+        {graphStyle === 'Curve' ? (
+          <Curve values={values} min={min} max={max} colour={stream.dot} />
+        ) : null}
+        {graphStyle === 'Bars' ? (
+          <Bars values={values} max={magnitudeMax} colour={stream.dot} />
+        ) : null}
       </div>
 
       <div className="stream-stats">
@@ -511,20 +740,31 @@ function Heatmap({ values, max, colour }: { values: number[]; max: number; colou
       aria-hidden
     >
       {values.map((value, index) => (
-        <i key={index} style={{ background: shade(colour, value, max) }} />
+        <i key={index} style={{ background: shade(colour, Math.abs(value), max) }} />
       ))}
     </div>
   );
 }
 
-function Curve({ values, max, colour }: { values: number[]; max: number; colour: string }) {
+function Curve({
+  values,
+  min,
+  max,
+  colour,
+}: {
+  values: number[];
+  min: number;
+  max: number;
+  colour: string;
+}) {
   if (values.length < 2) return <div className="stream-chart__empty" />;
   const width = 100;
   const height = 38;
   const step = width / (values.length - 1);
+  const spread = Math.max(1, max - min);
   const points = values.map((value, index) => ({
     x: index * step,
-    y: height - (max > 0 ? value / max : 0) * (height - 5) - 2.5,
+    y: height - ((value - min) / spread) * (height - 5) - 2.5,
   }));
   const line = points.reduce((path, current, index) => {
     if (index === 0) return `M${current.x.toFixed(2)} ${current.y.toFixed(2)}`;
@@ -562,8 +802,8 @@ function Bars({ values, max, colour }: { values: number[]; max: number; colour: 
         <i
           key={index}
           style={{
-            height: `${max > 0 && value > 0 ? Math.max(7, (value / max) * 100) : 4}%`,
-            background: value > 0 ? colour : 'var(--line-1)',
+            height: `${max > 0 && value !== 0 ? Math.max(7, (Math.abs(value) / max) * 100) : 4}%`,
+            background: value !== 0 ? colour : 'var(--line-1)',
           }}
         />
       ))}

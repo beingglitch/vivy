@@ -1,14 +1,21 @@
 'use client';
 
-import { useRef, useState, useTransition } from 'react';
+import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Area } from '@/lib/areas';
 import type { Task } from '@/lib/tasks';
 import { Empty } from '@/components/empty';
 import { CheckIcon } from '@/components/icons';
-import { addTask, completeTask, reopenTask } from '@/app/(app)/quadrant/actions';
+import {
+  addTask,
+  completeTask,
+  moveTomorrow,
+  removeTask,
+  reopenTask,
+} from '@/app/(app)/quadrant/actions';
 import { TaskForm } from '@/app/(app)/quadrant/task-form';
 import { Composer, TabBar } from '@/components/shell';
+import { SwipeTask } from '@/components/swipe-task';
 
 /**
  * Today.
@@ -105,71 +112,29 @@ export function TodayScreen({
 }
 
 function Row({ task, done, onEdit }: { task: Task; done: boolean; onEdit: () => void }) {
-  const [pending, start] = useTransition();
-  const gesture = useRef<{ x: number; held: boolean; timer: ReturnType<typeof setTimeout> } | null>(
-    null,
-  );
-
-  function finishGesture(event: React.PointerEvent<HTMLDivElement>) {
-    const active = gesture.current;
-    if (!active) return;
-    clearTimeout(active.timer);
-    gesture.current = null;
-    if (active.held || pending) return;
-
-    const distance = event.clientX - active.x;
-    if (Math.abs(distance) >= 10) return;
-    start(() => void (done ? reopenTask(task.id) : completeTask(task.id)));
-  }
-
   return (
-    <div
-      className="task task--gesture"
-      role="button"
-      tabIndex={0}
-      aria-label={`${task.title}. Tap to ${done ? 'reopen' : 'complete'} or press and hold to edit.`}
-      onPointerDown={(event) => {
-        if (pending) return;
-        gesture.current = {
-          x: event.clientX,
-          held: false,
-          timer: setTimeout(() => {
-            if (!gesture.current) return;
-            gesture.current.held = true;
-            navigator.vibrate?.(30);
-            onEdit();
-          }, 550),
-        };
-      }}
-      onPointerMove={(event) => {
-        if (!gesture.current) return;
-        if (Math.abs(event.clientX - gesture.current.x) > 10) clearTimeout(gesture.current.timer);
-      }}
-      onPointerUp={finishGesture}
-      onPointerCancel={() => {
-        if (gesture.current) clearTimeout(gesture.current.timer);
-        gesture.current = null;
-      }}
-      onKeyDown={(event) => {
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault();
-          start(() => void (done ? reopenTask(task.id) : completeTask(task.id)));
-        }
-      }}
+    <SwipeTask
+      label={task.title}
+      onTap={() => (done ? reopenTask(task.id) : completeTask(task.id))}
+      onHold={onEdit}
+      onTomorrow={() => moveTomorrow(task.id)}
+      onDelete={() => removeTask(task.id)}
     >
-      <span className={`task__box${done ? ' task__box--done' : ''}`} aria-hidden>
-        {done ? <CheckIcon /> : null}
-      </span>
-      <div className="task__body">
-        <span className={`task__title${done ? ' task__title--done' : ''}`}>{task.title}</span>
-        {!done ? (
-          <span className="task__meta">
-            {formatEffort(task.effortMinutes)}
-            {task.dueAt ? ` · due ${new Date(task.dueAt).toLocaleDateString('en-GB')}` : ''}
-          </span>
-        ) : null}
+      <div className="task task--gesture">
+        <span className={`task__box${done ? ' task__box--done' : ''}`} aria-hidden>
+          {done ? <CheckIcon /> : null}
+        </span>
+        <div className="task__body">
+          <span className={`task__title${done ? ' task__title--done' : ''}`}>{task.title}</span>
+          {!done ? (
+            <span className="task__meta">
+              {formatEffort(task.effortMinutes)}
+              {task.dueAt ? ` · due ${new Date(task.dueAt).toLocaleDateString('en-GB')}` : ''}
+            </span>
+          ) : null}
+        </div>
       </div>
-    </div>
+    </SwipeTask>
   );
 }
 

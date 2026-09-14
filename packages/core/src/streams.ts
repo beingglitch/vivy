@@ -70,14 +70,6 @@ export const STREAMS = [
     polarity: 'down-good',
   },
   {
-    key: 'money.networth',
-    label: 'Net worth',
-    from: ['money.balance', 'money.holding'],
-    unit: 'minor-currency',
-    ramp: 'teal',
-    polarity: 'up-good',
-  },
-  {
     key: 'sleep.hours',
     label: 'Sleep',
     from: ['wellbeing.sleep'],

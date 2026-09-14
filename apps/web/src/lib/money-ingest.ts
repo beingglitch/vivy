@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNotNull, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNotNull, ne, sql } from 'drizzle-orm';
 import type { VivyEvent } from '@vivy/core';
 import { accounts, balanceSnapshots, db, metricsDaily, txns } from '@vivy/db';
 
@@ -68,7 +68,7 @@ async function refreshBalances(userId: string, events: MoneyEvent[]): Promise<vo
   const conn = db();
   for (const pair of pairs) {
     const latest = await conn
-      .select({ balanceMinor: txns.balanceAfterMinor })
+      .select({ balanceMinor: txns.balanceAfterMinor, asOfTs: txns.ts })
       .from(txns)
       .where(
         and(
@@ -81,6 +81,7 @@ async function refreshBalances(userId: string, events: MoneyEvent[]): Promise<vo
       .orderBy(desc(txns.ts))
       .limit(1);
     const balanceMinor = latest[0]?.balanceMinor;
+    const asOfTs = latest[0]?.asOfTs;
     if (balanceMinor === null || balanceMinor === undefined) continue;
     await conn
       .insert(balanceSnapshots)
@@ -88,6 +89,7 @@ async function refreshBalances(userId: string, events: MoneyEvent[]): Promise<vo
         userId,
         accountId: pair.accountId,
         asOf: pair.date,
+        asOfTs,
         balanceMinor,
         authority: 'sms-inferred',
       })
@@ -98,13 +100,17 @@ async function refreshBalances(userId: string, events: MoneyEvent[]): Promise<vo
           balanceSnapshots.asOf,
           balanceSnapshots.authority,
         ],
-        set: { balanceMinor },
+        set: {
+          balanceMinor,
+          asOfTs,
+        },
       });
   }
 }
 
-async function refreshSpendRollups(userId: string, dates: string[]): Promise<void> {
+export async function refreshSpendRollups(userId: string, dates: string[]): Promise<void> {
   if (dates.length === 0) return;
+  const uniqueDates = [...new Set(dates)];
   const conn = db();
   const totals = await conn
     .select({
@@ -113,19 +119,24 @@ async function refreshSpendRollups(userId: string, dates: string[]): Promise<voi
     })
     .from(txns)
     .where(
-      and(eq(txns.userId, userId), eq(txns.direction, 'debit'), inArray(txns.localDate, dates)),
+      and(
+        eq(txns.userId, userId),
+        eq(txns.direction, 'debit'),
+        ne(txns.reviewStatus, 'excluded'),
+        inArray(txns.localDate, uniqueDates),
+      ),
     )
     .groupBy(txns.localDate);
 
-  if (totals.length === 0) return;
+  const totalsByDate = new Map(totals.map((total) => [total.localDate, total.value]));
   await conn
     .insert(metricsDaily)
     .values(
-      totals.map((total) => ({
+      uniqueDates.map((localDate) => ({
         userId,
-        localDate: total.localDate,
+        localDate,
         stream: 'money.spend',
-        value: total.value,
+        value: totalsByDate.get(localDate) ?? 0,
         meta: { currency: 'INR' },
         computedAt: new Date(),
       })),

@@ -14,16 +14,15 @@ export const dynamic = 'force-dynamic';
  */
 export default async function AreasPage() {
   const userId = await requirePageUserId();
-  const [areas, allAreas, openTasks, doneTasks] = await Promise.all([
+  const [areas, allAreas, doneTasks] = await Promise.all([
     listAreas(userId),
     listAllAreas(userId),
-    listTasks(userId),
     listTasks(userId, 'done'),
   ]);
 
   return (
     <>
-      <AreasScreen areas={areas} allAreas={allAreas} openTasks={openTasks} doneTasks={doneTasks} />
+      <AreasScreen areas={areas} allAreas={allAreas} doneTasks={doneTasks} />
       <Dock />
     </>
   );
